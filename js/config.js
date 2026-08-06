@@ -54,6 +54,9 @@ window.JOURNEY = (function () {
       id: 'ice',
       chapter: 'Ice World',
       video: 'videos/02-ice-world.mp4',
+      // This export opens on a stray frame that isn't part of the shot —
+      // measured as a hard pixel jump at ~0.10s. Start after it.
+      trim: [0.30, 0],
       length: 5.6,
       theme: { bg: '#061527', tint: '#7fd4ff', glow: '#d6f2ff', ink: '#eaf7ff' },
       sky: 'frost',

@@ -428,7 +428,9 @@ img { max-width: 100%; display: block; }
 }
 .prop--halo.is-caught { transform: translate(-50%,-50%) scale(1.7); opacity: 0; }
 .gate--swipe .prop--halo.is-caught { transform: scale(1.7); }
-.gate.is-done .prop.is-caught { opacity: 0; }
+/* The moment she catches it, it's gone. A pulsing halo that keeps blinking
+   over something already caught reads as "you missed". */
+.prop.is-caught { opacity: 0; pointer-events: none; }
 
 /* orbs of light */
 .prop--orb { width: 74px; height: 74px; border-radius: 50%; }
@@ -669,26 +671,36 @@ img { max-width: 100%; display: block; }
   opacity: 0; pointer-events: none;
   mix-blend-mode: screen;
   will-change: opacity, transform;
+  /* Many close stops instead of few far ones: that is what makes a gradient
+     read as diffused light rather than a printed circle. No hard core, no
+     rays — a torch beam through fog, not a lens flare. */
   background:
-    radial-gradient(circle at 50% 50%,
-      #ffffff 0%,
-      color-mix(in srgb, var(--pb) 92%, #fff) 9%,
-      color-mix(in srgb, var(--pb) 70%, transparent) 24%,
-      transparent 52%),
-    radial-gradient(ellipse 150% 55% at 50% 50%,
-      color-mix(in srgb, var(--pa) 78%, transparent) 0%,
-      transparent 66%);
+    radial-gradient(circle at 50% 48%,
+      color-mix(in srgb, var(--pb) 46%, #fff) 0%,
+      color-mix(in srgb, var(--pb) 52%, transparent) 11%,
+      color-mix(in srgb, var(--pb) 40%, transparent) 21%,
+      color-mix(in srgb, var(--pb) 27%, transparent) 32%,
+      color-mix(in srgb, var(--pa) 18%, transparent) 45%,
+      color-mix(in srgb, var(--pa) 9%,  transparent) 60%,
+      transparent 82%),
+    radial-gradient(ellipse 165% 70% at 50% 52%,
+      color-mix(in srgb, var(--pa) 30%, transparent) 0%,
+      color-mix(in srgb, var(--pa) 14%, transparent) 40%,
+      transparent 78%);
 }
-/* light spilling outward through the doorway */
+/* one slow, off-centre bloom so the light breathes instead of sitting still */
 .portal::before {
   content: ''; position: absolute; inset: 0;
-  background: repeating-conic-gradient(from 0deg at 50% 50%,
-    rgba(255,255,255,.34) 0deg 3deg, transparent 3deg 13deg);
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 4%, transparent 46%);
-  mask-image: radial-gradient(circle at 50% 50%, #000 4%, transparent 46%);
-  animation: rays 26s linear infinite;
+  background: radial-gradient(circle at 50% 44%,
+    color-mix(in srgb, #fff 34%, transparent) 0%,
+    color-mix(in srgb, var(--pb) 16%, transparent) 26%,
+    transparent 62%);
+  animation: bloom 7s ease-in-out infinite;
 }
-@keyframes rays { to { transform: rotate(360deg); } }
+@keyframes bloom {
+  0%, 100% { transform: scale(.9);  opacity: .55; }
+  50%      { transform: scale(1.14); opacity: .95; }
+}
 
 .burst { position: fixed; z-index: 90; pointer-events: none; }
 .burst i, .burst__glyph {

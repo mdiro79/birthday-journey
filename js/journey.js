@@ -489,7 +489,27 @@
         if (Math.abs(p - s.sp) < 0.0004) s.sp = p;
       }
 
-      if (s.video && s.duration) scrub(s.video, s.sp * s.duration * 0.999);
+      // Depth, not slide. The world she's leaving pushes past the camera while
+      // the next one rushes forward to meet her — so a seam reads as flying
+      // through a door, not as one panel sliding over another.
+      var enter = smoothstep(0, 0.14, p);
+      var exit  = smoothstep(0.86, 1, p);
+      // Depth comes from scale alone. Fading the pins as well would leave a
+      // black hole right on the seam, where one has faded out and the next
+      // hasn't faded in — the light is what covers the join.
+      if (s.video) {
+        var z = (1.34 - 0.34 * enter) * (1 + 0.46 * exit);
+        s.video.style.transform = 'scale(' + z.toFixed(4) + ')';
+      }
+
+      if (s.video && s.duration) {
+        // `trim` cuts seconds off the head/tail of a clip. Some exports carry
+        // a stray frame at the very start; trimming past it is cheaper and
+        // safer than re-encoding the file.
+        var tr = s.def.trim || [0, 0];
+        var a = tr[0], b = s.duration - tr[1];
+        scrub(s.video, a + s.sp * (b - a) * 0.999);
+      }
       paintCopy(s, s.sp);
       if (s.finale) paintFinale(s, s.sp);
       if (s.gate) paintGate(s, p, y, span, top);
@@ -553,7 +573,7 @@
 
   function paintPortal(y, vh) {
     var t = 0, from = null, to = null;
-    var reach = vh * 0.62;
+    var reach = vh * 0.95;      // wider reach = the light arrives gradually
 
     for (var i = 1; i < scenes.length; i++) {
       var d = Math.abs(y - scenes[i].el.offsetTop);
