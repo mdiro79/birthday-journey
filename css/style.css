@@ -698,47 +698,6 @@ img { max-width: 100%; display: block; }
 /* ══════════════════════════════════════════════════════════════════════════
    ONE-SHOT EFFECTS
    ══════════════════════════════════════════════════════════════════════════ */
-<<<<<<< HEAD
-/* ── the crossing between two worlds ───────────────────────────────────── */
-.portal {
-  --pa: #fff; --pb: #fff;
-  position: fixed; inset: -25%; z-index: 42;
-  opacity: 0; pointer-events: none;
-  mix-blend-mode: screen;
-  will-change: opacity, transform;
-  /* Many close stops instead of few far ones: that is what makes a gradient
-     read as diffused light rather than a printed circle. No hard core, no
-     rays — a torch beam through fog, not a lens flare. */
-  background:
-    radial-gradient(circle at 50% 48%,
-      color-mix(in srgb, var(--pb) 46%, #fff) 0%,
-      color-mix(in srgb, var(--pb) 52%, transparent) 11%,
-      color-mix(in srgb, var(--pb) 40%, transparent) 21%,
-      color-mix(in srgb, var(--pb) 27%, transparent) 32%,
-      color-mix(in srgb, var(--pa) 18%, transparent) 45%,
-      color-mix(in srgb, var(--pa) 9%,  transparent) 60%,
-      transparent 82%),
-    radial-gradient(ellipse 165% 70% at 50% 52%,
-      color-mix(in srgb, var(--pa) 30%, transparent) 0%,
-      color-mix(in srgb, var(--pa) 14%, transparent) 40%,
-      transparent 78%);
-}
-/* one slow, off-centre bloom so the light breathes instead of sitting still */
-.portal::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 44%,
-    color-mix(in srgb, #fff 34%, transparent) 0%,
-    color-mix(in srgb, var(--pb) 16%, transparent) 26%,
-    transparent 62%);
-  animation: bloom 7s ease-in-out infinite;
-}
-@keyframes bloom {
-  0%, 100% { transform: scale(.9);  opacity: .55; }
-  50%      { transform: scale(1.14); opacity: .95; }
-}
-
-=======
->>>>>>> parent of 73ef9e0 (اپدیت)
 .burst { position: fixed; z-index: 90; pointer-events: none; }
 .burst i, .burst__glyph {
   position: absolute; left: 0; top: 0; display: block;

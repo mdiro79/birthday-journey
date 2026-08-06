@@ -568,39 +568,6 @@
     }
   }
 
-<<<<<<< HEAD
-  /* ── the crossing ──────────────────────────────────────────────────────
-     Two videos meeting at a hard cut looks like a cut. A bloom of light that
-     peaks exactly on the seam — carrying the colour of the world she's
-     leaving into the colour of the one she's entering — looks like a door. */
-  var portal = null, portalT = 0;
-
-  function paintPortal(y, vh) {
-    var t = 0, from = null, to = null;
-    var reach = vh * 0.95;      // wider reach = the light arrives gradually
-
-    for (var i = 1; i < scenes.length; i++) {
-      var d = Math.abs(y - scenes[i].el.offsetTop);
-      if (d >= reach) continue;
-      var k = smoothstep(0, 1, 1 - d / reach);
-      if (k > t) { t = k; from = scenes[i - 1].def.theme; to = scenes[i].def.theme; }
-    }
-
-    if (t < 0.002 && portalT < 0.002) return;      // nothing to draw, touch no DOM
-    portalT = t;
-
-    // Never a full white-out — a trace of the world she's stepping into should
-    // always show through the light.
-    portal.style.opacity = (t * 0.93).toFixed(3);
-    portal.style.transform = 'scale(' + (0.55 + t * 0.75).toFixed(3) + ')';
-    if (to) {
-      portal.style.setProperty('--pa', from.glow);
-      portal.style.setProperty('--pb', to.tint);
-    }
-  }
-
-=======
->>>>>>> parent of 73ef9e0 (اپدیت)
   function paintFinale(s, p) {
     var t = smoothstep(s.def.finale.in, Math.min(1, s.def.finale.in + 0.13), p);
     s.finale.style.opacity = t.toFixed(3);
