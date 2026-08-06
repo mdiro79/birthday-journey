@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#05060f">
+<meta name="description" content="A little world, made for you.">
+<title>A Little World — For You</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Parisienne&family=Jost:wght@200;300;400&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="is-booting">
+
+<!-- ══════════════════════════ PRELOADER ══════════════════════════ -->
+<div class="preloader" id="preloader" role="status" aria-live="polite">
+  <div class="preloader__sky" aria-hidden="true"></div>
+
+  <div class="preloader__inner">
+    <p class="preloader__kicker">a little world is being built</p>
+
+    <div class="preloader__orb" aria-hidden="true">
+      <svg class="preloader__ring" viewBox="0 0 120 120">
+        <circle class="preloader__track" cx="60" cy="60" r="54" />
+        <circle class="preloader__fill" id="loadRing" cx="60" cy="60" r="54" />
+      </svg>
+      <div class="preloader__core"></div>
+      <div class="preloader__pct"><span id="loadPct">0</span><i>%</i></div>
+    </div>
+
+    <p class="preloader__status" id="loadStatus">waking up the stars…</p>
+  </div>
+
+  <p class="preloader__hint">please stay — it loads once, then it never stutters</p>
+</div>
+
+<!-- ══════════════════════════ STAGE ══════════════════════════ -->
+<main class="stage" id="stage" aria-label="An interactive birthday journey">
+  <!-- scenes are injected here by js/journey.js -->
+</main>
+
+<!-- ══════════════════════════ HUD ══════════════════════════ -->
+<div class="hud" id="hud" aria-hidden="true">
+  <div class="hud__progress"><span class="hud__bar" id="hudBar"></span></div>
+  <div class="hud__chapter" id="hudChapter"></div>
+</div>
+
+<button class="sound" id="soundBtn" type="button" aria-label="Toggle music" hidden>
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path class="sound__spk" d="M4 9.5h3.2L11.5 6v12L7.2 14.5H4z"/>
+    <path class="sound__on1" d="M14.8 9.4a3.6 3.6 0 0 1 0 5.2"/>
+    <path class="sound__on2" d="M17.2 7.1a7 7 0 0 1 0 9.8"/>
+    <path class="sound__off" d="M15.2 9.8l4.6 4.6M19.8 9.8l-4.6 4.6"/>
+  </svg>
+</button>
+
+<!-- scroll invitation, shown right after ENTER -->
+<div class="scrollhint" id="scrollHint" aria-hidden="true">
+  <span>scroll</span>
+  <svg viewBox="0 0 24 40"><path d="M12 6v16M6 17l6 6 6-6"/></svg>
+</div>
+
+<audio id="music" loop preload="auto" playsinline></audio>
+
+<script src="js/config.js"></script>
+<script src="js/preloader.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/journey.js"></script>
+</body>
+</html>

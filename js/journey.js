@@ -1,0 +1,712 @@
+/* ============================================================================
+   THE JOURNEY
+   ----------------------------------------------------------------------------
+   One continuous scroll. Scroll position drives each scene's video frame by
+   frame; at a few moments the scroll stops and waits for her — a tap, a swipe —
+   before the story is allowed to continue.
+   ========================================================================== */
+
+(function () {
+  'use strict';
+
+  var CFG    = window.JOURNEY;
+  var REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var stage   = document.getElementById('stage');
+  var hud     = document.getElementById('hud');
+  var hudBar  = document.getElementById('hudBar');
+  var hudChap = document.getElementById('hudChapter');
+  var music   = document.getElementById('music');
+  var soundBtn= document.getElementById('soundBtn');
+  var scrollHint = document.getElementById('scrollHint');
+
+  var scenes  = [];        // live scene records
+  var started = false;
+  var locked  = false;
+  var lockY   = 0;
+  var ticking = false;
+  var activeIdx = -1;
+
+  /* ── small helpers ─────────────────────────────────────────────────────── */
+  var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+  function smoothstep(a, b, x) {
+    if (b <= a) return x >= b ? 1 : 0;
+    var t = clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+  function easeInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  function setVH() {
+    if (window.innerHeight > 0) {
+      document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     BUILD — turn the config into DOM
+     ══════════════════════════════════════════════════════════════════════ */
+  function buildScene(def, i) {
+    var sec = document.createElement('section');
+    sec.className = 'scene scene--' + def.id;
+    sec.id = 'scene-' + def.id;
+    sec.dataset.index = i;
+    sec.style.setProperty('--bg', def.theme.bg);
+    sec.style.setProperty('--tint', def.theme.tint);
+    sec.style.setProperty('--glow', def.theme.glow);
+    sec.style.setProperty('--ink', def.theme.ink);
+    sec.style.setProperty('--len', def.length);
+    sec.setAttribute('aria-label', 'Chapter ' + (i + 1) + ': ' + def.chapter);
+
+    var pin = document.createElement('div');
+    pin.className = 'pin';
+
+    /* animated fallback sky — always there, video sits on top of it */
+    var sky = document.createElement('div');
+    sky.className = 'sky sky--' + (def.sky || 'night');
+    sky.setAttribute('aria-hidden', 'true');
+    pin.appendChild(sky);
+
+    /* the video */
+    var video = null;
+    if (def.video) {
+      video = document.createElement('video');
+      video.className = 'film';
+      video.muted = true;
+      video.defaultMuted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.setAttribute('muted', '');
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+      video.setAttribute('aria-hidden', 'true');
+      pin.appendChild(video);
+    }
+
+    var grade = document.createElement('div');
+    grade.className = 'grade';
+    grade.setAttribute('aria-hidden', 'true');
+    pin.appendChild(grade);
+
+    if (!REDUCE) FX.field(pin, def.particles);
+
+    /* interactive props live here */
+    var props = document.createElement('div');
+    props.className = 'props';
+    pin.appendChild(props);
+
+    /* the words */
+    var copy = document.createElement('div');
+    copy.className = 'copy';
+    var lineEls = (def.lines || []).map(function (l) {
+      var p = document.createElement('p');
+      p.className = 'line line--' + (l.size || 'sm');
+      p.innerHTML = l.text;
+      copy.appendChild(p);
+      return p;
+    });
+    pin.appendChild(copy);
+
+    /* name written in starlight */
+    if (def.signature) {
+      var sig = document.createElement('div');
+      sig.className = 'starname';
+      def.signature.split('').forEach(function (ch, n) {
+        var s = document.createElement('span');
+        s.textContent = ch;
+        s.style.setProperty('--n', n);
+        sig.appendChild(s);
+      });
+      sig.setAttribute('aria-label', def.signature);
+      props.appendChild(sig);
+    }
+
+    /* the last card */
+    if (def.finale) {
+      props.appendChild(buildFinale(def.finale));
+    }
+
+    sec.appendChild(pin);
+
+    var rec = {
+      def: def, el: sec, pin: pin, video: video, props: props,
+      lines: lineEls, copy: copy, gate: null, p: 0, duration: 0
+    };
+
+    if (def.gate) rec.gate = buildGate(rec, def.gate);
+
+    return rec;
+  }
+
+  function buildFinale(f) {
+    var card = document.createElement('div');
+    card.className = 'finale';
+    card.innerHTML =
+      '<p class="finale__script">' + f.script + '</p>' +
+      '<p class="finale__name">' + f.name + '</p>' +
+      '<span class="finale__rule" aria-hidden="true">♡</span>' +
+      f.body.map(function (b) { return '<p class="finale__body">' + b + '</p>'; }).join('') +
+      '<p class="finale__sign">' + f.sign + '</p>' +
+      '<button class="finale__replay" type="button">' + f.replay +
+        ' <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4"/></svg>' +
+      '</button>';
+
+    card.querySelector('.finale__replay').addEventListener('click', replay);
+    return card;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     GATES — the moments the story waits for her
+     ══════════════════════════════════════════════════════════════════════ */
+  var SPOTS = {
+    orb:   [[50, 34], [30, 50], [68, 60]],
+    photo: [[26, 30], [64, 26], [38, 52], [72, 50]],
+    crystal: [[50, 46]],
+    butterfly: [[50, 42]]
+  };
+
+  var HOTSPOT_LABEL = {
+    butterfly: 'Touch the butterfly',
+    gate: 'Open the gate',
+    gift: 'Open the gift'
+  };
+
+  function buildGate(rec, g) {
+    var wrap = document.createElement('div');
+    wrap.className = 'gate gate--' + g.type + ' gate--' + (g.target || 'x');
+
+    var gate = {
+      spec: g, el: wrap, done: false, hits: 0,
+      need: g.count || 1, targets: [], says: null
+    };
+
+    if (g.type === 'start') {
+      var btn = document.createElement('button');
+      btn.className = 'enter';
+      btn.type = 'button';
+      btn.innerHTML = '<span>' + g.label + '</span><i aria-hidden="true">✦</i>';
+      btn.addEventListener('click', function () { begin(); });
+      wrap.appendChild(btn);
+
+      var cap = document.createElement('p');
+      cap.className = 'gate__hint';
+      cap.textContent = g.hint;
+      wrap.appendChild(cap);
+
+    } else if (g.type === 'tap') {
+      var spots = SPOTS[g.target] || SPOTS.orb;
+      for (var i = 0; i < gate.need; i++) {
+        var pos = spots[i % spots.length];
+        var t = makeTarget(g.target, i, rec.def, g.hotspot);
+        t.style.left = pos[0] + '%';
+        t.style.top  = pos[1] + '%';
+        t.style.setProperty('--n', i);
+        bindTap(t, gate, i);
+        wrap.appendChild(t);
+        gate.targets.push(t);
+      }
+      wrap.appendChild(hintEl(g.hint, gate.need > 1 ? gate.need : 0));
+
+    } else if (g.type === 'swipe') {
+      var obj = makeTarget(g.target, 0, rec.def, g.hotspot);
+      wrap.appendChild(obj);
+      gate.targets.push(obj);
+      wrap.appendChild(hintEl(g.hint, 0, true));
+      bindSwipe(wrap, gate);
+    }
+
+    var toast = document.createElement('p');
+    toast.className = 'gate__says';
+    wrap.appendChild(toast);
+    gate.says = toast;
+
+    if (g.type !== 'start') {
+      var rescue = document.createElement('button');
+      rescue.className = 'gate__rescue';
+      rescue.type = 'button';
+      rescue.innerHTML = '<span>tap anywhere</span>';
+      rescue.addEventListener('click', function () {
+        gate.targets.forEach(function (t, n) {
+          if (!t.classList.contains('is-caught')) setTimeout(function () { t.click(); }, n * 260);
+        });
+      });
+      wrap.appendChild(rescue);
+    }
+
+    rec.pin.appendChild(wrap);
+    return gate;
+  }
+
+  function hintEl(text, counter, swipe) {
+    var h = document.createElement('div');
+    h.className = 'gate__hint' + (swipe ? ' gate__hint--swipe' : '');
+    h.innerHTML =
+      (swipe ? '<svg class="gate__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15l7-7 7 7"/><path d="M5 21l7-7 7 7"/></svg>' : '') +
+      '<span class="gate__label">' + text + '</span>' +
+      (counter ? '<span class="gate__count"><b>0</b>/' + counter + '</span>' : '') +
+      (swipe ? '' : '<svg class="gate__finger" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11V5.6a1.6 1.6 0 0 1 3.2 0V11m0-1.2a1.4 1.4 0 0 1 2.8 0V12m0-1a1.4 1.4 0 0 1 2.8 0v4.6a5.4 5.4 0 0 1-5.4 5.4h-1.5a4 4 0 0 1-3.2-1.6l-2.6-3.5a1.5 1.5 0 0 1 2.3-1.9L9 15.2"/></svg>');
+    return h;
+  }
+
+  function makeTarget(kind, i, def, hotspot) {
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'prop prop--' + kind;
+
+    // When the footage already shows the thing she's reaching for, drawing a
+    // second one on top just fights the film. Give her a halo of light instead.
+    if (hotspot) {
+      el.className = 'prop prop--halo';
+      el.innerHTML = '<span class="halo__ring"></span><span class="halo__ring halo__ring--2"></span>' +
+                     '<span class="halo__dot"></span>';
+      el.setAttribute('aria-label', HOTSPOT_LABEL[kind] || 'Touch here');
+      return el;
+    }
+
+    if (kind === 'orb') {
+      el.innerHTML = '<span class="orb__core"></span><span class="orb__halo"></span>';
+      el.setAttribute('aria-label', 'Catch light ' + (i + 1));
+
+    } else if (kind === 'crystal') {
+      el.innerHTML = '<span class="crystal__body"></span><span class="crystal__shine"></span>';
+      el.setAttribute('aria-label', 'Touch the crystal');
+
+    } else if (kind === 'butterfly') {
+      el.innerHTML = '<span class="wing wing--l"></span><span class="wing wing--r"></span><span class="bfly__body"></span>';
+      el.setAttribute('aria-label', 'Touch the butterfly');
+
+    } else if (kind === 'photo') {
+      var src = (def.photos || [])[i];
+      el.innerHTML =
+        '<span class="photo__thread" aria-hidden="true"></span>' +
+        '<span class="photo__frame">' +
+          (src ? '<img src="' + src + '" alt="">' : '<span class="photo__empty">♡</span>') +
+        '</span>';
+      el.setAttribute('aria-label', 'Open memory ' + (i + 1));
+      el.style.setProperty('--tilt', (i % 2 ? 1 : -1) * (3 + i) + 'deg');
+
+    } else if (kind === 'gate') {
+      el.innerHTML = '<span class="door"><span class="door__leaf"></span><span class="door__light"></span></span>';
+      el.setAttribute('aria-label', 'Open the gate');
+
+    } else if (kind === 'gift') {
+      el.innerHTML =
+        '<span class="gift">' +
+          '<span class="gift__glow"></span>' +
+          '<span class="gift__lid"><span class="gift__bow"></span></span>' +
+          '<span class="gift__box"><span class="gift__ribbon"></span></span>' +
+        '</span>';
+      el.setAttribute('aria-label', 'Open the gift');
+    }
+    return el;
+  }
+
+  function bindTap(el, gate, i) {
+    el.addEventListener('click', function (ev) {
+      if (gate.done || el.classList.contains('is-caught')) return;
+      ev.preventDefault();
+      el.classList.add('is-caught');
+      gate.hits++;
+      FX.tap(14);
+
+      var r = el.getBoundingClientRect();
+      FX.burst(r.left + r.width / 2, r.top + r.height / 2, {
+        count: 16, spread: 130,
+        glyph: gate.spec.target === 'photo' ? '♥' : null
+      });
+
+      var msg = (gate.spec.says || [])[i];
+      if (msg) say(gate, msg);
+
+      var c = gate.el.querySelector('.gate__count b');
+      if (c) c.textContent = gate.hits;
+
+      if (gate.hits >= gate.need) setTimeout(function () { clearGate(gate); }, 620);
+    });
+  }
+
+  function bindSwipe(wrap, gate) {
+    var y0 = null, fired = false;
+
+    function start(y) { y0 = y; fired = false; }
+    function move(y) {
+      if (y0 === null || fired || gate.done) return;
+      var d = y0 - y;
+      if (d > 8) wrap.classList.add('is-pulling');
+      wrap.style.setProperty('--pull', clamp(d / 90, 0, 1).toFixed(3));
+      if (d > 78) { fired = true; open(); }
+    }
+    function end() { y0 = null; if (!fired) { wrap.classList.remove('is-pulling'); wrap.style.setProperty('--pull', 0); } }
+    function open() {
+      wrap.classList.add('is-opened');
+      wrap.style.setProperty('--pull', 1);
+      FX.tap([12, 40, 22]);
+      FX.flash(getComputedStyle(wrap).getPropertyValue('--glow') || '#fff', 700);
+      var r = wrap.getBoundingClientRect();
+      FX.burst(r.left + r.width / 2, r.top + r.height * 0.45,
+               { count: 26, spread: 220, glyph: gate.spec.target === 'gift' ? '♥' : null });
+      var msg = (gate.spec.says || [])[0];
+      if (msg) say(gate, msg);
+      setTimeout(function () { clearGate(gate); }, 900);
+    }
+
+    wrap.addEventListener('touchstart', function (e) { start(e.touches[0].clientY); }, { passive: true });
+    wrap.addEventListener('touchmove',  function (e) { move(e.touches[0].clientY); }, { passive: true });
+    wrap.addEventListener('touchend', end);
+    wrap.addEventListener('touchcancel', end);
+
+    wrap.addEventListener('mousedown', function (e) { start(e.clientY); });
+    window.addEventListener('mousemove', function (e) { if (y0 !== null) move(e.clientY); });
+    window.addEventListener('mouseup', end);
+
+    // tapping the prop works too — nobody should get stuck on a gift box
+    gate.targets[0].addEventListener('click', function (e) {
+      e.preventDefault();
+      if (!fired && !gate.done) { fired = true; open(); }
+    });
+  }
+
+  function say(gate, msg) {
+    gate.says.textContent = msg;
+    gate.says.classList.remove('is-on');
+    void gate.says.offsetWidth;
+    gate.says.classList.add('is-on');
+  }
+
+  /* gate satisfied → hand the scroll back and glide forward a little */
+  function clearGate(gate) {
+    if (gate.done) return;
+    gate.done = true;
+    gate.el.classList.add('is-done');
+
+    var rec = scenes.filter(function (s) { return s.gate === gate; })[0];
+    var push = (gate.spec.reward || 0.12) * scrollSpan(rec);
+    unlock();
+    glide(window.scrollY + push, REDUCE ? 0 : 1400);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     SCROLL CONTROL
+     ══════════════════════════════════════════════════════════════════════ */
+  function scrollSpan(rec) {
+    return Math.max(1, rec.el.offsetHeight - window.innerHeight);
+  }
+
+  var rescueTimer = null;
+
+  /* which gate is holding the scroll right here? */
+  function gateAt(y) {
+    for (var i = 0; i < scenes.length; i++) {
+      var s = scenes[i];
+      if (!s.gate || s.gate.spec.type === 'start') continue;
+      if (y >= s.el.offsetTop - 2 && y < s.el.offsetTop + s.el.offsetHeight) return s.gate;
+    }
+    return null;
+  }
+
+  function block(e) { e.preventDefault(); }
+  function blockKeys(e) {
+    if (/^(Arrow|Page|Home|End|Space| )/.test(e.key)) e.preventDefault();
+  }
+
+  /* A fling can carry her well past the moment she's meant to stop at, so the
+     lock anchors to the gate itself and eases her back to it, rather than
+     freezing wherever the momentum happened to run out. */
+  function lockScroll(atY) {
+    if (locked) return;
+    locked = true;
+    lockY = Math.round(atY);
+    var over = window.scrollY - lockY;
+    if (over > 4) glide(lockY, REDUCE ? 0 : Math.min(520, 160 + over * 0.6));
+    else if (over < 0) window.scrollTo(0, lockY);
+    document.body.classList.add('is-locked');
+
+    // Nobody gets stranded. If she hasn't found the prop after a while, the
+    // whole screen quietly becomes the button.
+    clearTimeout(rescueTimer);
+    rescueTimer = setTimeout(function () {
+      var g = gateAt(lockY);
+      if (g && !g.done) g.el.classList.add('is-rescued');
+    }, 11000);
+    window.addEventListener('wheel', block, { passive: false });
+    window.addEventListener('touchmove', block, { passive: false });
+    window.addEventListener('keydown', blockKeys);
+  }
+
+  function unlock() {
+    if (!locked) return;
+    locked = false;
+    clearTimeout(rescueTimer);
+    document.body.classList.remove('is-locked');
+    window.removeEventListener('wheel', block, { passive: false });
+    window.removeEventListener('touchmove', block, { passive: false });
+    window.removeEventListener('keydown', blockKeys);
+  }
+
+  /* scripted scroll — this is what makes a cleared gate feel like a reward */
+  var gliding = null;
+  function glide(to, ms) {
+    if (gliding) cancelAnimationFrame(gliding);
+    var from = window.scrollY;
+    var max = document.body.scrollHeight - window.innerHeight;
+    to = clamp(to, 0, max);
+    if (!ms) { window.scrollTo(0, to); gliding = null; return; }
+
+    var t0 = performance.now();
+    (function step(now) {
+      var t = clamp((now - t0) / ms, 0, 1);
+      window.scrollTo(0, from + (to - from) * easeInOut(t));
+      gliding = t < 1 ? requestAnimationFrame(step) : null;
+    })(t0);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     THE FRAME LOOP — scroll position in, everything else out
+     ══════════════════════════════════════════════════════════════════════ */
+  function onScroll() {
+    if (locked && !gliding && window.scrollY > lockY) window.scrollTo(0, lockY);
+    if (!ticking) { ticking = true; requestAnimationFrame(render); }
+  }
+
+  function render() {
+    ticking = false;
+    var y  = window.scrollY;
+    var vh = window.innerHeight;
+    var best = -1;
+
+    for (var i = 0; i < scenes.length; i++) {
+      var s = scenes[i];
+      var top = s.el.offsetTop;
+      var span = scrollSpan(s);
+      var p = clamp((y - top) / span, 0, 1);
+      s.p = p;
+
+      var visible = (y + vh > top - vh * 0.5) && (y < top + s.el.offsetHeight + vh * 0.5);
+      s.el.classList.toggle('is-near', visible);
+      if (!visible) continue;
+
+      // The scene on screen is simply the one whose section owns this scroll
+      // position — its pin is what's stuck to the viewport right now.
+      if (y >= top - 1 && y < top + s.el.offsetHeight) best = i;
+      else if (best < 0 && y >= top) best = i;
+
+      if (s.video && s.duration) scrub(s.video, p * s.duration * 0.999);
+      paintCopy(s, p);
+      if (s.def.signature) paintName(s, p);
+      if (s.gate) paintGate(s, p, y, span, top);
+    }
+
+    if (best !== activeIdx && best >= 0) {
+      activeIdx = best;
+      hudChap.textContent = (best + 1) + ' · ' + scenes[best].def.chapter;
+      hudChap.classList.remove('is-on'); void hudChap.offsetWidth;
+      hudChap.classList.add('is-on');
+    }
+
+    var max = document.body.scrollHeight - vh;
+    hudBar.style.transform = 'scaleX(' + (max > 0 ? clamp(y / max, 0, 1) : 0) + ')';
+  }
+
+  /* ── frame-accurate scrubbing without drowning the decoder ─────────────
+     Never queue a second seek while one is in flight; remember where we want
+     to be and go there the moment the previous seek reports back. This one
+     rule is the difference between silk and a slideshow.                    */
+  function scrub(v, t) {
+    v._want = t;
+    if (v._busy || v.readyState < 2) return;
+    if (Math.abs(v.currentTime - t) < 0.03) return;
+    v._busy = true;
+    try { v.currentTime = t; } catch (e) { v._busy = false; }
+  }
+
+  function bindScrub(v) {
+    v.addEventListener('seeked', function () {
+      v._busy = false;
+      if (v._want != null && Math.abs(v.currentTime - v._want) > 0.05) {
+        v._busy = true;
+        try { v.currentTime = v._want; } catch (e) { v._busy = false; }
+      }
+    });
+    v.addEventListener('error', function () { v._busy = false; });
+  }
+
+  function paintCopy(s, p) {
+    var defs = s.def.lines || [];
+    for (var i = 0; i < defs.length; i++) {
+      var l = defs[i], el = s.lines[i];
+      var inA = smoothstep(l.in, l.in + 0.07, p);
+      var out = 1 - smoothstep(l.out - 0.07, l.out, p);
+      var o = inA * out;
+      el.style.opacity = o.toFixed(3);
+      el.style.transform = 'translate3d(0,' + ((1 - inA) * 26 - (1 - out) * 22).toFixed(1) + 'px,0)';
+      el.style.filter = 'blur(' + ((1 - o) * 6).toFixed(2) + 'px)';
+      el.style.pointerEvents = o > 0.5 ? 'auto' : 'none';
+    }
+  }
+
+  function paintName(s, p) {
+    var t = smoothstep(0.18, 0.62, p);
+    s.props.querySelector('.starname').style.setProperty('--reveal', t.toFixed(3));
+  }
+
+  function paintGate(s, p, y, span, top) {
+    var g = s.gate, spec = g.spec;
+    if (spec.type === 'start') return;
+
+    var near = smoothstep(spec.at - 0.16, spec.at - 0.01, p);
+    g.el.style.setProperty('--near', near.toFixed(3));
+    g.el.classList.toggle('is-live', near > 0.6 && !g.done);
+
+    if (!g.done && p >= spec.at && started) lockScroll(top + spec.at * span);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     START / REPLAY / SOUND
+     ══════════════════════════════════════════════════════════════════════ */
+  function begin() {
+    if (started) return;
+    started = true;
+    unlock();
+    document.body.classList.add('is-playing');
+    hud.setAttribute('aria-hidden', 'false');
+    soundBtn.hidden = false;
+
+    // Warm every decoder inside the user gesture — the last insurance against
+    // a hitch the first time a scene scrolls into view.
+    scenes.forEach(function (s) {
+      if (!s.video) return;
+      var pr = s.video.play();
+      if (pr && pr.then) pr.then(function () { s.video.pause(); s.video.currentTime = 0; })
+                           .catch(function () {});
+      else { try { s.video.pause(); } catch (e) {} }
+    });
+
+    music.volume = 0;
+    var pr = music.play();
+    if (pr && pr.then) pr.then(fadeIn).catch(function () { soundBtn.classList.add('is-muted'); });
+    else fadeIn();
+
+    scenes[0].gate.el.classList.add('is-done');
+    scrollHint.setAttribute('aria-hidden', 'false');
+    scrollHint.classList.add('is-on');
+    setTimeout(function () { scrollHint.classList.remove('is-on'); }, 5200);
+
+    FX.tap([10, 60, 18]);
+    render();
+  }
+
+  function fadeIn() {
+    soundBtn.classList.remove('is-muted');
+    var target = CFG.music.volume, t0 = performance.now();
+    (function step(now) {
+      var t = clamp((now - t0) / 2600, 0, 1);
+      music.volume = target * t;
+      if (t < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+
+  soundBtn.addEventListener('click', function () {
+    if (music.paused) { music.play(); soundBtn.classList.remove('is-muted'); }
+    else { music.pause(); soundBtn.classList.add('is-muted'); }
+  });
+
+  function replay() {
+    unlock();
+    scenes.forEach(function (s) {
+      if (!s.gate || s.gate.spec.type === 'start') return;
+      s.gate.done = false;
+      s.gate.hits = 0;
+      s.gate.el.classList.remove('is-done', 'is-opened', 'is-pulling', 'is-live', 'is-rescued');
+      s.gate.el.style.setProperty('--pull', 0);
+      s.gate.says.classList.remove('is-on');
+      s.gate.targets.forEach(function (t) { t.classList.remove('is-caught'); });
+      var c = s.gate.el.querySelector('.gate__count b');
+      if (c) c.textContent = '0';
+    });
+    glide(0, REDUCE ? 0 : 1600);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     BOOT
+     ══════════════════════════════════════════════════════════════════════ */
+  function boot() {
+    setVH();
+
+    CFG.scenes.forEach(function (def, i) {
+      var rec = buildScene(def, i);
+      scenes.push(rec);
+      stage.appendChild(rec.el);
+    });
+
+    var manifest = CFG.scenes.filter(function (d) { return d.video; })
+                             .map(function (d) { return d.video; });
+    manifest.push(CFG.music.src);
+
+    var ring = document.getElementById('loadRing');
+    var pct  = document.getElementById('loadPct');
+    var stat = document.getElementById('loadStatus');
+    var C = 2 * Math.PI * 54;
+    ring.style.strokeDasharray = C;
+    ring.style.strokeDashoffset = C;
+
+    Preloader.load(manifest, function (p, text) {
+      ring.style.strokeDashoffset = C * (1 - p);
+      pct.textContent = Math.round(p * 100);
+      if (text && stat.textContent !== text) stat.textContent = text;
+    }).then(function (media) {
+
+      // Hand each scene the element the preloader already decoded.
+      scenes.forEach(function (s) {
+        if (!s.def.video) return;
+        var m = media[s.def.video];
+        if (!m) return;
+        var fresh = m.el || s.video;
+        fresh.className = 'film';
+        fresh.setAttribute('aria-hidden', 'true');
+        if (m.el && s.video.parentNode) {
+          s.video.parentNode.replaceChild(fresh, s.video);
+          s.video = fresh;
+        } else {
+          s.video.src = m.url;
+        }
+        s.duration = isFinite(s.video.duration) ? s.video.duration : 0;
+        bindScrub(s.video);
+        s.video.addEventListener('durationchange', function () {
+          if (isFinite(s.video.duration)) s.duration = s.video.duration;
+        });
+      });
+
+      var mus = media[CFG.music.src];
+      music.src = mus ? mus.url : CFG.music.src;
+
+      document.body.classList.remove('is-booting');
+      document.body.classList.add('is-ready');
+      var pre = document.getElementById('preloader');
+      pre.classList.add('is-gone');
+      setTimeout(function () { pre.remove(); }, 1100);
+
+      // Nothing moves until she presses ENTER — the first scene is a doorway,
+      // not a page you can scroll past.
+      window.scrollTo(0, 0);
+      lockScroll(0);
+      render();
+    }).catch(function (err) {
+      document.getElementById('loadStatus').textContent =
+        'something went wrong loading the world — try refreshing';
+      console.error(err);
+    });
+
+    window.__J = { render: render, scenes: scenes, begin: begin };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // A tab that was hidden mid-frame never fired its rAF; catch up on return.
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) { ticking = false; render(); }
+    });
+    window.addEventListener('resize', function () { setVH(); render(); });
+    window.addEventListener('orientationchange', function () {
+      setTimeout(function () { setVH(); render(); }, 260);
+    });
+  }
+
+  boot();
+})();
