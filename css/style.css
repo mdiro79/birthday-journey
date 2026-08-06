@@ -111,10 +111,15 @@ img { max-width: 100%; display: block; }
    ══════════════════════════════════════════════════════════════════════════ */
 .stage { position: relative; z-index: 1; }
 
+/* Sections are pure scroll ruler now: height and stacking order, nothing that
+   paints. They used to carry `background: var(--bg)`, and once the pins went
+   fixed that background became a solid block sitting on top of the scene
+   before it — the next section's box slides up the screen and paints over the
+   picture, which is the very seam this rewrite exists to remove. The colour
+   moved onto .pin, where it fades together with everything else. */
 .scene {
   position: relative;
   height: calc(var(--len, 2) * 100vh);
-  background: var(--bg);
 }
 /* small-viewport units keep the story honest when mobile browser chrome
    slides in and out mid-scroll; the vh above stays as the fallback. */
@@ -122,11 +127,24 @@ img { max-width: 100%; display: block; }
   .scene { height: calc(var(--len, 2) * 100svh); }
 }
 
+/* Fixed, not sticky. A sticky pin has to let go at the bottom of its section,
+   and that letting-go IS the slide — one panel riding up off the screen while
+   the next rides in underneath. Fixed pins all share the same square of glass;
+   which world you see is decided by opacity and scale, so the camera can move
+   between them instead of the page moving under them. */
 .pin {
-  position: sticky; top: 0;
-  height: 100vh; height: 100svh;
+  position: fixed; inset: 0;
   overflow: hidden;
   isolation: isolate;
+  background: var(--bg);
+  opacity: 0;
+}
+
+/* The parts she reads and touches stay inside the small viewport, so nothing
+   ends up behind the phone's browser bar even though the picture is full-bleed. */
+.copy, .gate, .props {
+  position: absolute; left: 0; right: 0; top: 0;
+  height: 100vh; height: 100svh;
 }
 
 /* Off-screen scenes stop compositing entirely: no particle animation, no
@@ -137,10 +155,16 @@ img { max-width: 100%; display: block; }
 .scene:not(.is-near) .sky::before,
 .scene:not(.is-near) .sky::after { animation-play-state: paused; }
 
-/* the video */
+/* The video, cut 12% oversize. Arriving worlds grow into place from slightly
+   further away, and the spare margin is what stops that scale-down from
+   showing a rim of empty pin around the picture.
+
+   Width and height are spelled out on purpose. A <video> is a replaced
+   element: give it left/right and no width and it ignores them and lays out at
+   the file's own pixel size, which is a full-screen film cropped to a corner. */
 .film {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
+  position: absolute; left: -6%; top: -6%;
+  width: 112%; height: 112%;
   object-fit: cover;
   z-index: 1;
   opacity: 0; transition: opacity 1s ease;
@@ -267,7 +291,7 @@ img { max-width: 100%; display: block; }
    THE WORDS
    ══════════════════════════════════════════════════════════════════════════ */
 .copy {
-  position: absolute; inset: 0; z-index: 7;
+  z-index: 7;
   display: grid; place-items: start center;
   padding: clamp(4.5rem, 15vh, 9rem) 1.6rem 0;
   pointer-events: none;
@@ -298,9 +322,11 @@ img { max-width: 100%; display: block; }
    ══════════════════════════════════════════════════════════════════════════ */
 .gate {
   --near: 0; --pull: 0;
-  position: absolute; inset: 0; z-index: 8;
+  z-index: 8;
   pointer-events: none;
 }
+.props { z-index: 4; pointer-events: none; }
+.props > * { pointer-events: auto; }
 .gate.is-live { pointer-events: auto; }
 .gate.is-done { pointer-events: none; }
 
@@ -698,47 +724,37 @@ img { max-width: 100%; display: block; }
 /* ══════════════════════════════════════════════════════════════════════════
    ONE-SHOT EFFECTS
    ══════════════════════════════════════════════════════════════════════════ */
-<<<<<<< HEAD
-/* ── the crossing between two worlds ───────────────────────────────────── */
-.portal {
-  --pa: #fff; --pb: #fff;
-  position: fixed; inset: -25%; z-index: 42;
+/* ── the light on the seam between two worlds ──────────────────────────────
+   Only the spill. The real light of a crossing is the exposure ramp on the
+   films themselves (journey.js); this carries the colour of the world she is
+   leaving into the colour of the one ahead.
+
+   Two rules keep it from looking drawn on. No hard centre — the brightest
+   stop is soft and the falloff is spread over many close stops, so the eye
+   can't find an edge to call a circle. And it's wide: a broad wash biased
+   slightly above the middle, the way light actually arrives in a room, rather
+   than a lamp sitting in the centre of the frame. */
+.crossing {
+  --ca: #fff; --cb: #fff;
+  position: fixed; inset: -12%; z-index: 42;
   opacity: 0; pointer-events: none;
   mix-blend-mode: screen;
   will-change: opacity, transform;
-  /* Many close stops instead of few far ones: that is what makes a gradient
-     read as diffused light rather than a printed circle. No hard core, no
-     rays — a torch beam through fog, not a lens flare. */
   background:
-    radial-gradient(circle at 50% 48%,
-      color-mix(in srgb, var(--pb) 46%, #fff) 0%,
-      color-mix(in srgb, var(--pb) 52%, transparent) 11%,
-      color-mix(in srgb, var(--pb) 40%, transparent) 21%,
-      color-mix(in srgb, var(--pb) 27%, transparent) 32%,
-      color-mix(in srgb, var(--pa) 18%, transparent) 45%,
-      color-mix(in srgb, var(--pa) 9%,  transparent) 60%,
-      transparent 82%),
-    radial-gradient(ellipse 165% 70% at 50% 52%,
-      color-mix(in srgb, var(--pa) 30%, transparent) 0%,
-      color-mix(in srgb, var(--pa) 14%, transparent) 40%,
-      transparent 78%);
-}
-/* one slow, off-centre bloom so the light breathes instead of sitting still */
-.portal::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 44%,
-    color-mix(in srgb, #fff 34%, transparent) 0%,
-    color-mix(in srgb, var(--pb) 16%, transparent) 26%,
-    transparent 62%);
-  animation: bloom 7s ease-in-out infinite;
-}
-@keyframes bloom {
-  0%, 100% { transform: scale(.9);  opacity: .55; }
-  50%      { transform: scale(1.14); opacity: .95; }
+    radial-gradient(ellipse 78% 62% at 50% 42%,
+      color-mix(in srgb, var(--cb) 30%, transparent) 0%,
+      color-mix(in srgb, var(--cb) 25%, transparent) 15%,
+      color-mix(in srgb, var(--cb) 18%, transparent) 29%,
+      color-mix(in srgb, var(--ca) 12%, transparent) 43%,
+      color-mix(in srgb, var(--ca) 7%,  transparent) 57%,
+      color-mix(in srgb, var(--ca) 3%,  transparent) 72%,
+      transparent 88%),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--cb) 8%, transparent) 0%,
+      transparent 44%,
+      color-mix(in srgb, var(--ca) 6%, transparent) 100%);
 }
 
-=======
->>>>>>> parent of 73ef9e0 (اپدیت)
 .burst { position: fixed; z-index: 90; pointer-events: none; }
 .burst i, .burst__glyph {
   position: absolute; left: 0; top: 0; display: block;
