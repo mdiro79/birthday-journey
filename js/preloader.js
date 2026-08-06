@@ -96,21 +96,27 @@ window.Preloader = (function () {
   function load(urls, onStep) {
     var totals = {};      // url → bytes expected
     var loaded = {};      // url → bytes received
+    var done   = {};      // url → finished downloading
     var shown = 0;        // last percentage we displayed (never goes backwards)
     var chatter = 0;
 
-    urls.forEach(function (u) { totals[u] = 0; loaded[u] = 0; });
+    urls.forEach(function (u) { totals[u] = 0; loaded[u] = 0; done[u] = false; });
 
     function report(stage) {
-      var t = 0, l = 0, known = 0;
+      var t = 0, l = 0, known = 0, finished = 0;
       urls.forEach(function (u) {
         if (totals[u]) { t += totals[u]; l += loaded[u]; known++; }
+        if (done[u]) finished++;
       });
 
-      // Before any content-length lands, fall back to "files finished / files".
-      var p = known
-        ? (l / Math.max(t, 1)) * (known / urls.length) + ((urls.length - known) / urls.length) * 0
-        : 0;
+      var p = known ? (l / Math.max(t, 1)) * (known / urls.length) : 0;
+
+      // A CDN that streams without a Content-Length leaves every total at 0,
+      // and the ring then sits on 0% for the whole download with nothing wrong
+      // — it just has no idea how big anything is. Counting finished files is
+      // coarse, but it always moves, so take whichever is further along.
+      var byFile = finished / urls.length;
+      if (byFile > p) p = byFile;
 
       // Downloading is 88% of the wait; decoding + fonts is the last 12%.
       p = Math.min(p, 1) * 0.88 + (stage || 0) * 0.12;
@@ -131,8 +137,10 @@ window.Preloader = (function () {
           loaded[u] = seen;
           report(0);
         }).then(function (blob) {
+          done[u] = true; report(0);
           return { key: u, url: URL.createObjectURL(blob) };
         }).catch(function () {
+          done[u] = true; report(0);
           return { key: u, url: u };            // network hiccup → stream it live
         });
       });
