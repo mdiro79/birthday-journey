@@ -1,8 +1,13 @@
 # A Little World
 
-An interactive scroll journey — a puppy crosses ten worlds looking for a birthday
-gift box. Scrolling drives each video frame by frame; at six moments the scroll
-stops and waits for a tap or a swipe before the story continues.
+An interactive scroll journey. Barfi — a small white dog — was sent by Mehdi to
+walk Asma to a place Mehdi picked out for her, and he knows the way because
+Mehdi told him the way. They cross six worlds to get there, and Barfi does all
+the talking.
+
+Scrolling drives each video frame by frame; at six moments the scroll stops and
+waits for a tap or a swipe, because Barfi has asked her for something and won't
+go on until she does it.
 
 ## Run it locally
 
@@ -44,14 +49,17 @@ the first load wants Wi-Fi; after that it's cached.
 
 ## The six scenes
 
-| # | Scene | Video | Interaction |
-|---|-------|-------|-------------|
-| 1 | The Beginning | `01-beginning.mp4` | ENTER button |
-| 2 | Ice World | `02-ice-world.mp4` | tap the ice |
-| 3 | Follow the Lights | `03-follow-the-lights.mp4` | tap 3 lights |
-| 4 | Magic Forest | `04-magic-forest.mp4` | swipe up to open |
-| 5 | Flower Land | `06-flower-land.mp4` | tap the butterfly |
-| 6 | The Surprise | `09-surprise.mp4` | swipe to open + final card |
+| # | Scene | Video | What Barfi asks for |
+|---|-------|-------|---------------------|
+| 1 | The Beginning | `01-beginning.mp4` | come with me — ENTER |
+| 2 | Ice World | `02-ice-world.mp4` | touch the ice |
+| 3 | Follow the Lights | `03-follow-the-lights.mp4` | catch three lights |
+| 4 | Magic Forest | `04-magic-forest.mp4` | push the door up with me |
+| 5 | Flower Land | `06-flower-land.mp4` | say hello to the butterfly |
+| 6 | The Surprise | `09-surprise.mp4` | open the gift + final card |
+
+`HER`, `FROM` and `DOG` at the top of `js/config.js` are the three names the
+whole script is written from — change one and every line follows.
 
 Every scene is real footage — there are no filler scenes. The birthday card
 rises over the closing seconds of scene 6 rather than getting a page of its own.

@@ -112,6 +112,15 @@
     /* the words */
     var copy = document.createElement('div');
     copy.className = 'copy';
+
+    // Words this small, over footage this bright, need something behind them.
+    // A permanent dark band would flatten every shot, so the scrim only exists
+    // while a line is on screen and fades out with it.
+    var scrim = document.createElement('div');
+    scrim.className = 'copy__scrim';
+    scrim.setAttribute('aria-hidden', 'true');
+    copy.appendChild(scrim);
+
     var lineEls = (def.lines || []).map(function (l) {
       var p = document.createElement('p');
       p.className = 'line line--' + (l.size || 'sm');
@@ -129,9 +138,9 @@
 
     var rec = {
       def: def, el: sec, pin: pin, video: video, props: props,
-      lines: lineEls, copy: copy, finale: finaleEl,
+      lines: lineEls, copy: copy, scrim: scrim, finale: finaleEl,
       gate: null, p: 0, sp: -1, dp: -1, duration: 0,
-      op: -1, vis: null, flt: ''
+      op: -1, vis: null, flt: '', scr: -1
     };
 
     if (def.gate) rec.gate = buildGate(rec, def.gate);
@@ -622,15 +631,23 @@
 
   function paintCopy(s, p) {
     var defs = s.def.lines || [];
+    var loud = 0;
     for (var i = 0; i < defs.length; i++) {
       var l = defs[i], el = s.lines[i];
       var inA = smoothstep(l.in, l.in + 0.07, p);
       var out = 1 - smoothstep(l.out - 0.07, l.out, p);
       var o = inA * out;
+      if (o > loud) loud = o;
       el.style.opacity = o.toFixed(3);
       el.style.transform = 'translate3d(0,' + ((1 - inA) * 26 - (1 - out) * 22).toFixed(1) + 'px,0)';
       el.style.filter = 'blur(' + ((1 - o) * 6).toFixed(2) + 'px)';
       el.style.pointerEvents = o > 0.5 ? 'auto' : 'none';
+    }
+    // The scrim rides the loudest line, so it's there for every word and gone
+    // the moment the picture has the screen to itself again.
+    if (Math.abs(s.scr - loud) > 0.004) {
+      s.scr = loud;
+      s.scrim.style.opacity = loud.toFixed(3);
     }
   }
 

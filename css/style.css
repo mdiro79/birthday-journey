@@ -296,15 +296,33 @@ img { max-width: 100%; display: block; }
   padding: clamp(4.5rem, 15vh, 9rem) 1.6rem 0;
   pointer-events: none;
 }
+/* The words sit over live footage, and some of it is a snowfield in full
+   moonlight. The glow alone loses that fight, so the scrim puts a soft field
+   of the scene's own colour behind the text — driven from paintCopy(), so it
+   is only ever on screen while there is something to read. */
+.copy__scrim {
+  position: absolute; inset: 0; z-index: -1;
+  pointer-events: none; opacity: 0;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--bg) 76%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 62%, transparent) 22%,
+    color-mix(in srgb, var(--bg) 34%, transparent) 45%,
+    color-mix(in srgb, var(--bg) 12%, transparent) 64%,
+    transparent 80%);
+}
+
 .line {
   grid-area: 1 / 1;
   margin: 0; max-width: 20ch; text-align: center;
   opacity: 0; will-change: opacity, transform;
   color: var(--ink);
+  /* A tight near-black shadow first — that is the one doing the legibility
+     work on a bright frame. The wide coloured glows sit behind it for mood. */
   text-shadow:
-    0 0 26px color-mix(in srgb, var(--glow) 55%, transparent),
-    0 0 60px color-mix(in srgb, var(--tint) 40%, transparent),
-    0 2px 18px rgba(0,0,0,.55);
+    0 1px 3px rgba(0,0,0,.9),
+    0 2px 18px rgba(0,0,0,.7),
+    0 0 26px color-mix(in srgb, var(--glow) 50%, transparent),
+    0 0 60px color-mix(in srgb, var(--tint) 38%, transparent);
 }
 .line--lg {
   font-size: clamp(1.85rem, 7.6vw, 3.1rem);

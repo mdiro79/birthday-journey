@@ -12,16 +12,18 @@
 window.Preloader = (function () {
   'use strict';
 
+  /* One line per tenth of the wait, in the order the journey is built. Three
+     of these used to name scenes that no longer exist. */
   var CHATTER = [
     'waking up the stars…',
+    'teaching Barfi the way…',
     'freezing the ice world…',
     'hanging three little lights…',
     'unlocking the garden gate…',
-    'dusting off old memories…',
     'planting every flower…',
-    'holding the sunset still…',
-    'spelling your name in the sky…',
     'wrapping the last gift…',
+    'brushing the snow off his paws…',
+    'he’s waiting at the door…',
     'almost. don’t blink.'
   ];
 
