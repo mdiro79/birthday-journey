@@ -30,9 +30,6 @@
   var lockY   = 0;
   var activeIdx = -1;
 
-  // The light that lives on the seam between two worlds.
-  var crossing = null, crossT = -1;
-
   /* ── small helpers ─────────────────────────────────────────────────────── */
   var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
   function smoothstep(a, b, x) {
@@ -41,12 +38,6 @@
     return t * t * (3 - 2 * t);
   }
   function easeInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
-  // A camera doesn't move linearly. It leans into the move and lands softly —
-  // easeIn for the world rushing away, easeOut for the one we settle into.
-  // Quadratic, not cubic: a cubic hides almost all of the travel in the last
-  // fifth of the move, which is exactly where the shot has already faded out.
-  function easeIn(t)  { return t * t; }
-  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
   function setVH() {
     if (window.innerHeight > 0) {
@@ -67,9 +58,6 @@
     sec.style.setProperty('--glow', def.theme.glow);
     sec.style.setProperty('--ink', def.theme.ink);
     sec.style.setProperty('--len', def.length);
-    // Every pin is a fixed, full-screen layer now, so the only thing deciding
-    // who is in front is this: the world she's walking into is always on top.
-    sec.style.zIndex = i;
     sec.setAttribute('aria-label', 'Chapter ' + (i + 1) + ': ' + def.chapter);
 
     var pin = document.createElement('div');
@@ -130,8 +118,7 @@
     var rec = {
       def: def, el: sec, pin: pin, video: video, props: props,
       lines: lineEls, copy: copy, finale: finaleEl,
-      gate: null, p: 0, sp: -1, dp: -1, duration: 0,
-      op: -1, vis: null, flt: ''
+      gate: null, p: 0, sp: -1, duration: 0
     };
 
     if (def.gate) rec.gate = buildGate(rec, def.gate);
@@ -474,103 +461,64 @@
   }
   function stopLoop() { looping = false; }
 
-  /* Every pin is a fixed full-screen layer, so scenes no longer take turns
-     sliding past the viewport — they occupy the same space and the camera
-     travels between them. The one screen-height of scroll that sits between
-     one pin's last frame and the next scene's first is the crossing: the shot
-     she's leaving accelerates past the lens and blows out into light, and the
-     next one grows up out of that light to meet her. */
   function render(dt) {
     dt = dt || 16.667;
     var y  = window.scrollY;
     var vh = window.innerHeight;
-    var best = -1, bestOp = -1;
-    var seam = 0, seamFrom = null, seamTo = null;
+    var best = -1;
 
     for (var i = 0; i < scenes.length; i++) {
       var s = scenes[i];
-      var top  = s.el.offsetTop;
+      var top = s.el.offsetTop;
       var span = scrollSpan(s);
-      var last = i === scenes.length - 1;
-
-      // p — the scene's own scripted timeline. Words and gates hang off this,
-      // so it keeps meaning exactly what it meant before.
       var p = clamp((y - top) / span, 0, 1);
       s.p = p;
 
-      // a — arriving out of the previous crossing.  b — leaving into the next.
-      // Each crossing is the one screen-height of scroll between two scenes.
-      var a = i === 0 ? 1 : clamp((y - (top - vh)) / vh, 0, 1);
-      var b = last    ? 0 : clamp((y - (top + span)) / vh, 0, 1);
+      // Anything more than half a screen away stops painting entirely — that
+      // is what keeps the last scenes as light as the first ones.
+      var visible = (y + vh > top - vh * 0.5) && (y < top + s.el.offsetHeight + vh * 0.5);
+      s.el.classList.toggle('is-near', visible);
+      if (!visible) { s.sp = -1; continue; }
 
-      // Off-screen scenes stop painting entirely — that is what keeps the last
-      // scenes as light as the first ones.
-      var here = a > 0 && b < 1;
-      s.el.classList.toggle('is-near', here);
-      if (!here) { s.sp = -1; s.dp = -1; setLayer(s, 0); continue; }
-
-      // fp — the film's own clock. It starts the moment she begins flying in
-      // and keeps rolling as the shot passes the camera, so neither side of a
-      // crossing is ever a frozen still.
-      var f0 = i === 0 ? top : top - vh;
-      var f1 = top + span + (last ? 0 : vh);
-      var fp = clamp((y - f0) / (f1 - f0), 0, 1);
+      // The scene on screen is simply the one whose section owns this scroll
+      // position — its pin is what's stuck to the viewport right now.
+      if (y >= top - 1 && y < top + s.el.offsetHeight) best = i;
+      else if (best < 0 && y >= top) best = i;
 
       // Damped follow: the film eases toward where the scroll says it should
       // be instead of teleporting there. This is the weight in the scroll.
-      var k = 1 - Math.pow(1 - EASE, dt / 16.667);
-      if (s.sp < 0) s.sp = fp;
-      else { s.sp += (fp - s.sp) * k; if (Math.abs(fp - s.sp) < 0.0004) s.sp = fp; }
-      if (s.dp < 0) s.dp = p;
-      else { s.dp += (p - s.dp) * k; if (Math.abs(p - s.dp) < 0.0004) s.dp = p; }
-
-      // Depth, never a slide. Leaving accelerates away from her; arriving
-      // decelerates into place; in between, a slow push keeps the shot alive.
-      var arrive = a >= 1 ? 1 : 0.90 + 0.10 * easeOut(a);
-      var leave  = b <= 0 ? 1 : 1 + 0.95 * easeIn(b);
-      var push   = 1 + 0.05 * s.sp;
-
-      // The light is the film's own exposure, not a lamp switched on over it:
-      // one shot burns out as it passes, the next one's eyes adjust. Kept
-      // shallow — past about a third of a stop it stops reading as light in
-      // the room and starts reading as a filter laid over the picture.
-      var expo = b > 0 ? 0.40 * smoothstep(0.12, 0.95, b)
-               : a < 1 ? 0.26 * (1 - smoothstep(0.04, 0.72, a))
-               : 0;
-
-      if (s.video) {
-        s.video.style.transform = 'scale(' + (arrive * leave * push).toFixed(4) + ')';
-        var flt = expo > 0.002
-          ? 'brightness(' + (1 + expo).toFixed(3) + ') saturate(' + (1 - expo * 0.3).toFixed(3) + ')'
-          : '';
-        if (s.flt !== flt) { s.flt = flt; s.video.style.filter = flt; }
+      if (s.sp < 0) s.sp = p;
+      else {
+        var k = 1 - Math.pow(1 - EASE, dt / 16.667);
+        s.sp += (p - s.sp) * k;
+        if (Math.abs(p - s.sp) < 0.0004) s.sp = p;
       }
 
-      // The join itself: the outgoing pin holds full strength well into the
-      // crossing and only gives way once the incoming one already covers the
-      // screen, so there is never a frame with a hole in it.
-      var op = (a >= 1 ? 1 : smoothstep(0.08, 0.72, a)) *
-               (b <= 0 ? 1 : 1 - smoothstep(0.38, 1.00, b));
-      setLayer(s, op);
+      // Depth, not slide. The world she's leaving pushes past the camera while
+      // the next one rushes forward to meet her — so a seam reads as flying
+      // through a door, not as one panel sliding over another.
+      var enter = smoothstep(0, 0.14, p);
+      var exit  = smoothstep(0.86, 1, p);
+      // Depth comes from scale alone. Fading the pins as well would leave a
+      // black hole right on the seam, where one has faded out and the next
+      // hasn't faded in — the light is what covers the join.
+      if (s.video) {
+        var z = (1.34 - 0.34 * enter) * (1 + 0.46 * exit);
+        s.video.style.transform = 'scale(' + z.toFixed(4) + ')';
+      }
 
       if (s.video && s.duration) {
         // `trim` cuts seconds off the head/tail of a clip. Some exports carry
-        // stray frames at the very start; trimming past them is cheaper and
+        // a stray frame at the very start; trimming past it is cheaper and
         // safer than re-encoding the file.
         var tr = s.def.trim || [0, 0];
-        var t0 = tr[0], t1 = s.duration - tr[1];
-        scrub(s.video, t0 + s.sp * (t1 - t0) * 0.999);
+        var a = tr[0], b = s.duration - tr[1];
+        scrub(s.video, a + s.sp * (b - a) * 0.999);
       }
-      paintCopy(s, s.dp);
-      if (s.finale) paintFinale(s, s.dp);
+      paintCopy(s, s.sp);
+      if (s.finale) paintFinale(s, s.sp);
       if (s.gate) paintGate(s, p, y, span, top);
-
-      // Whoever owns the most of the screen owns the chapter title.
-      if (op > bestOp) { bestOp = op; best = i; }
-      if (b > 0 && b < 1) { seam = b; seamFrom = s.def.theme; seamTo = scenes[i + 1].def.theme; }
     }
-
-    paintCrossing(seam, seamFrom, seamTo);
 
     if (best !== activeIdx && best >= 0) {
       activeIdx = best;
@@ -581,20 +529,6 @@
 
     var max = document.body.scrollHeight - vh;
     hudBar.style.transform = 'scaleX(' + (max > 0 ? clamp(y / max, 0, 1) : 0) + ')';
-  }
-
-  /* One pin's presence on screen. Touching the DOM only when the number has
-     actually moved is what keeps six full-screen layers affordable. */
-  function setLayer(s, op) {
-    if (Math.abs(s.op - op) > 0.002) {
-      s.op = op;
-      s.pin.style.opacity = op.toFixed(3);
-    }
-    var vis = op > 0.004;
-    if (s.vis !== vis) {
-      s.vis = vis;
-      s.pin.style.visibility = vis ? '' : 'hidden';
-    }
   }
 
   /* ── frame-accurate scrubbing without drowning the decoder ─────────────
@@ -634,29 +568,39 @@
     }
   }
 
-  /* ── the light on the seam ─────────────────────────────────────────────
-     The films do most of the work: one burns out as it passes the lens, the
-     next comes up out of that. This layer is only the spill — the colour of
-     the world she's leaving bleeding into the colour of the one ahead. It is
-     deliberately weak and wide. A bright disc in the middle of the screen is
-     what makes a transition look drawn on; light that has no edge and no
-     centre you can point at is what makes it look filmed. */
-  function paintCrossing(t, from, to) {
-    if (t < 0.002 && crossT < 0.002) { crossT = 0; return; }   // touch no DOM
-    crossT = t;
+<<<<<<< HEAD
+  /* ── the crossing ──────────────────────────────────────────────────────
+     Two videos meeting at a hard cut looks like a cut. A bloom of light that
+     peaks exactly on the seam — carrying the colour of the world she's
+     leaving into the colour of the one she's entering — looks like a door. */
+  var portal = null, portalT = 0;
 
-    // A bell, so the spill arrives and leaves with the camera rather than
-    // snapping on at the cut.
-    var bell = Math.sin(Math.PI * clamp(t, 0, 1));
-    crossing.style.opacity = (Math.pow(bell, 0.9) * 0.3).toFixed(3);
-    // It drifts toward her as she moves through it — light has depth too.
-    crossing.style.transform = 'scale(' + (0.92 + t * 0.5).toFixed(3) + ')';
-    if (from && to) {
-      crossing.style.setProperty('--ca', from.glow);
-      crossing.style.setProperty('--cb', to.tint);
+  function paintPortal(y, vh) {
+    var t = 0, from = null, to = null;
+    var reach = vh * 0.95;      // wider reach = the light arrives gradually
+
+    for (var i = 1; i < scenes.length; i++) {
+      var d = Math.abs(y - scenes[i].el.offsetTop);
+      if (d >= reach) continue;
+      var k = smoothstep(0, 1, 1 - d / reach);
+      if (k > t) { t = k; from = scenes[i - 1].def.theme; to = scenes[i].def.theme; }
+    }
+
+    if (t < 0.002 && portalT < 0.002) return;      // nothing to draw, touch no DOM
+    portalT = t;
+
+    // Never a full white-out — a trace of the world she's stepping into should
+    // always show through the light.
+    portal.style.opacity = (t * 0.93).toFixed(3);
+    portal.style.transform = 'scale(' + (0.55 + t * 0.75).toFixed(3) + ')';
+    if (to) {
+      portal.style.setProperty('--pa', from.glow);
+      portal.style.setProperty('--pb', to.tint);
     }
   }
 
+=======
+>>>>>>> parent of 73ef9e0 (اپدیت)
   function paintFinale(s, p) {
     var t = smoothstep(s.def.finale.in, Math.min(1, s.def.finale.in + 0.13), p);
     s.finale.style.opacity = t.toFixed(3);
@@ -690,13 +634,10 @@
     // a hitch the first time a scene scrolls into view.
     scenes.forEach(function (s) {
       if (!s.video) return;
-      // Rewinding to 0 would put every clip back on the frame `trim` exists to
-      // skip; send them home to their real first frame instead.
-      var home = head(s.def) || 0.001;
       var pr = s.video.play();
-      if (pr && pr.then) pr.then(function () { s.video.pause(); scrub(s.video, home); })
+      if (pr && pr.then) pr.then(function () { s.video.pause(); s.video.currentTime = 0; })
                            .catch(function () {});
-      else { try { s.video.pause(); scrub(s.video, home); } catch (e) {} }
+      else { try { s.video.pause(); } catch (e) {} }
     });
 
     music.volume = 0;
@@ -747,18 +688,8 @@
   /* ══════════════════════════════════════════════════════════════════════
      BOOT
      ══════════════════════════════════════════════════════════════════════ */
-  /* Where a clip actually begins. Never 0 — see `trim` in the config. */
-  function head(def) {
-    return (def.trim && def.trim[0]) || 0;
-  }
-
   function boot() {
     setVH();
-
-    crossing = document.createElement('div');
-    crossing.className = 'crossing';
-    crossing.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(crossing);
 
     CFG.scenes.forEach(function (def, i) {
       var rec = buildScene(def, i);
@@ -802,10 +733,6 @@
         s.video.addEventListener('durationchange', function () {
           if (isFinite(s.video.duration)) s.duration = s.video.duration;
         });
-        // A <video> paints frame 0 the moment it has data, whatever the story
-        // says. Park every clip on its real first frame now, behind the
-        // preloader, so a trimmed head can never flash on screen later.
-        scrub(s.video, head(s.def) || 0.001);
       });
 
       var mus = media[CFG.music.src];

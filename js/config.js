@@ -53,10 +53,9 @@ window.JOURNEY = (function () {
       id: 'ice',
       chapter: 'Ice World',
       video: 'videos/02-ice-world.mp4',
-      // This clip used to open on two frames of a design mock-up — a grid of
-      // phone screenshots that flashed on screen every time the story crossed
-      // into it. Those frames are cut out of the file now, so there is nothing
-      // left to trim past and the shot starts on its own first frame.
+      // This export opens on a stray frame that isn't part of the shot —
+      // measured as a hard pixel jump at ~0.10s. Start after it.
+      trim: [0.30, 0],
       length: 5.6,
       theme: { bg: '#061527', tint: '#7fd4ff', glow: '#d6f2ff', ink: '#eaf7ff' },
       sky: 'frost',
