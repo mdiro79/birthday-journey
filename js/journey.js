@@ -148,6 +148,7 @@
      ══════════════════════════════════════════════════════════════════════ */
   var SPOTS = {
     orb:   [[50, 34], [30, 50], [68, 60]],
+    crystal: [[50, 46]],
     butterfly: [[50, 42]]
   };
 
@@ -253,7 +254,11 @@
       el.innerHTML = '<span class="orb__core"></span><span class="orb__halo"></span>';
       el.setAttribute('aria-label', 'Catch light ' + (i + 1));
 
-        } else if (kind === 'butterfly') {
+    } else if (kind === 'crystal') {
+      el.innerHTML = '<span class="crystal__body"></span><span class="crystal__shine"></span>';
+      el.setAttribute('aria-label', 'Touch the crystal');
+
+    } else if (kind === 'butterfly') {
       el.innerHTML = '<span class="wing wing--l"></span><span class="wing wing--r"></span><span class="bfly__body"></span>';
       el.setAttribute('aria-label', 'Touch the butterfly');
 
@@ -522,8 +527,6 @@
       hudChap.classList.add('is-on');
     }
 
-    paintPortal(y, vh);
-
     var max = document.body.scrollHeight - vh;
     hudBar.style.transform = 'scaleX(' + (max > 0 ? clamp(y / max, 0, 1) : 0) + ')';
   }
@@ -565,6 +568,7 @@
     }
   }
 
+<<<<<<< HEAD
   /* ── the crossing ──────────────────────────────────────────────────────
      Two videos meeting at a hard cut looks like a cut. A bloom of light that
      peaks exactly on the seam — carrying the colour of the world she's
@@ -595,16 +599,13 @@
     }
   }
 
+=======
+>>>>>>> parent of 73ef9e0 (اپدیت)
   function paintFinale(s, p) {
     var t = smoothstep(s.def.finale.in, Math.min(1, s.def.finale.in + 0.13), p);
     s.finale.style.opacity = t.toFixed(3);
     s.finale.style.transform = 'translate3d(0,' + ((1 - t) * 30).toFixed(1) + 'px,0)';
     s.finale.style.pointerEvents = t > 0.9 ? 'auto' : 'none';
-    // Nothing from the gate layer may survive under the last words.
-    if (s.gate) {
-      s.gate.el.style.opacity = (1 - t).toFixed(3);
-      s.gate.el.style.visibility = t > 0.98 ? 'hidden' : '';
-    }
   }
 
   function paintGate(s, p, y, span, top) {
@@ -689,11 +690,6 @@
      ══════════════════════════════════════════════════════════════════════ */
   function boot() {
     setVH();
-
-    portal = document.createElement('div');
-    portal.className = 'portal';
-    portal.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(portal);
 
     CFG.scenes.forEach(function (def, i) {
       var rec = buildScene(def, i);

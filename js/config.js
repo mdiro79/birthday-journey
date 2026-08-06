@@ -16,9 +16,8 @@ window.JOURNEY = (function () {
   'use strict';
 
   /* ── who this is for ───────────────────────────────────────────────────── */
-  var HER  = 'Asma';        // ← her name, on the final card
-  var FROM = 'Mehdi';       // ← who sent the dog, and who signs the card
-  var DOG  = 'Barfi';       // ← the puppy's name. Change it here, it updates everywhere.
+  var HER  = 'Asma';        // ← her name, written in starlight at the end
+  var FROM = 'Mehdi';       // ← signature on the final card
 
   /* ── background music ──────────────────────────────────────────────────── */
   var MUSIC = { src: 'audio/silver-thread.mp3', volume: 0.55 };
@@ -42,9 +41,9 @@ window.JOURNEY = (function () {
       sky: 'night',
       particles: { type: 'star', count: 22 },
       lines: [
-        { text: 'This is ' + DOG + '.', in: 0.00, out: 0.40, size: 'lg' },
-        { text: FROM + ' sent him<br>to find you.', in: 0.38, out: 0.70, size: 'sm' },
-        { text: 'He knows the way.<br>All you have to do is follow.', in: 0.68, out: 1.00, size: 'sm' }
+        { text: 'I made a little world<br>for you…', in: 0.00, out: 0.46, size: 'lg' },
+        { text: 'It only exists<br>when you’re here.', in: 0.44, out: 0.78, size: 'sm' },
+        { text: 'He’s been waiting all night.', in: 0.76, out: 1.00, size: 'sm' }
       ],
       gate: { type: 'start', at: 0.30, label: 'ENTER', hint: 'tap to start' }
     },
@@ -62,11 +61,15 @@ window.JOURNEY = (function () {
       sky: 'frost',
       particles: { type: 'snow', count: 24 },
       lines: [
-        { text: 'The first road<br>is a cold one.', in: 0.02, out: 0.34, size: 'lg' },
-        { text: 'He walks it anyway.', in: 0.32, out: 0.58, size: 'sm' },
-        { text: 'Small dog.<br>Very serious mission.', in: 0.62, out: 1.00, size: 'sm' }
+        { text: 'Something beautiful is<br>waiting ahead…', in: 0.02, out: 0.34, size: 'lg' },
+        { text: 'The road there is cold.<br>He doesn’t care.', in: 0.32, out: 0.55, size: 'sm' },
+        { text: 'Cold things melt<br>around you.', in: 0.76, out: 1.00, size: 'sm' }
       ],
-      gate: null
+      gate: {
+        type: 'tap', at: 0.60, count: 1, target: 'crystal',
+        hint: 'tap the ice', reward: 0.14,
+        says: ['one touch and the whole world warms up ❄']
+      }
     },
 
     /* 03 ─────────────────────────────────────────────────────────────────── */
@@ -79,9 +82,9 @@ window.JOURNEY = (function () {
       sky: 'night',
       particles: { type: 'spark', count: 18 },
       lines: [
-        { text: 'The lights know<br>where to go', in: 0.02, out: 0.32, size: 'lg' },
-        { text: 'Three of them.<br>Help him catch each one.', in: 0.30, out: 0.52, size: 'sm' },
-        { text: 'He got them all.<br>They were always for you.', in: 0.82, out: 1.00, size: 'sm' }
+        { text: 'Lights will show us<br>the way', in: 0.02, out: 0.32, size: 'lg' },
+        { text: 'Three of them.<br>One wish each.', in: 0.30, out: 0.52, size: 'sm' },
+        { text: 'He caught every one.<br>They were all for you.', in: 0.82, out: 1.00, size: 'sm' }
       ],
       gate: {
         type: 'tap', at: 0.54, count: 3, target: 'orb',
@@ -105,7 +108,7 @@ window.JOURNEY = (function () {
       particles: { type: 'firefly', count: 14 },
       lines: [
         { text: 'A door, in the middle<br>of nowhere.', in: 0.02, out: 0.34, size: 'lg' },
-        { text: 'This is where he<br>needs your help.', in: 0.32, out: 0.55, size: 'sm' },
+        { text: 'Push it. I dare you.', in: 0.32, out: 0.55, size: 'sm' },
         { text: 'A new world<br>has opened', in: 0.74, out: 1.00, size: 'lg' }
       ],
       gate: {
@@ -125,9 +128,9 @@ window.JOURNEY = (function () {
       sky: 'bloom',
       particles: { type: 'petal', count: 20 },
       lines: [
-        { text: 'Almost there now.', in: 0.02, out: 0.30, size: 'lg' },
-        { text: DOG + ' got distracted.<br>Honestly, fair.', in: 0.28, out: 0.55, size: 'sm' },
-        { text: 'Everything you walk past<br>decides to bloom.', in: 0.78, out: 1.00, size: 'sm' }
+        { text: 'You make everything<br>more beautiful', in: 0.02, out: 0.34, size: 'lg' },
+        { text: 'Even a very confused<br>little dog.', in: 0.32, out: 0.55, size: 'sm' },
+        { text: 'Everything you touch<br>decides to bloom.', in: 0.78, out: 1.00, size: 'sm' }
       ],
       gate: {
         type: 'tap', at: 0.58, count: 1, target: 'butterfly', hotspot: true,
@@ -146,8 +149,8 @@ window.JOURNEY = (function () {
       sky: 'bloom',
       particles: { type: 'heart', count: 20 },
       lines: [
-        { text: 'This is the place<br>he was bringing you to.', in: 0.02, out: 0.28, size: 'sm' },
-        { text: DOG + ' carried it<br>the whole way', in: 0.26, out: 0.50, size: 'lg' }
+        { text: 'He carried it the<br>whole way here.', in: 0.02, out: 0.28, size: 'sm' },
+        { text: 'The biggest gift<br>is for you', in: 0.26, out: 0.50, size: 'lg' }
       ],
       gate: {
         type: 'swipe', at: 0.52, target: 'gift', hotspot: true,
@@ -161,8 +164,8 @@ window.JOURNEY = (function () {
         name: HER,
         body: [
           'Twenty-one looks unfairly good on you.',
-          'I could have given you a thousand gifts. I sent you a little dog and a whole world instead.',
-          'A world that only exists because you’re in it. ♡'
+          'I could give you a thousand gifts… but I wanted to give you a little world instead.',
+          'A little world that exists only for you. ♡'
         ],
         sign: 'with everything, ' + FROM,
         replay: 'Replay our journey'

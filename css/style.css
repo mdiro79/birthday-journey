@@ -48,9 +48,20 @@ img { max-width: 100%; display: block; }
 .preloader.is-gone { opacity: 0; filter: blur(14px); pointer-events: none; }
 
 .preloader__sky {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse 80% 55% at 50% 38%, rgba(60,90,180,.22), transparent 72%);
+  position: absolute; inset: -20%;
+  background:
+    radial-gradient(1.4px 1.4px at 18% 22%, #fff 40%, transparent 41%),
+    radial-gradient(1.2px 1.2px at 72% 15%, #dfe9ff 40%, transparent 41%),
+    radial-gradient(1.6px 1.6px at 41% 68%, #fff 40%, transparent 41%),
+    radial-gradient(1.1px 1.1px at 86% 54%, #cbd9ff 40%, transparent 41%),
+    radial-gradient(1.3px 1.3px at 28% 84%, #fff 40%, transparent 41%),
+    radial-gradient(1.2px 1.2px at 62% 40%, #eaf0ff 40%, transparent 41%),
+    radial-gradient(ellipse 70% 50% at 50% 40%, rgba(60,90,180,.20), transparent 70%);
+  background-size: 240px 240px, 300px 300px, 200px 200px, 340px 340px, 280px 280px, 260px 260px, 100% 100%;
+  animation: drift 60s linear infinite;
+  opacity: .8;
 }
+@keyframes drift { to { transform: translate3d(-140px, -90px, 0); } }
 
 .preloader__inner { display: grid; justify-items: center; gap: 1.6rem; z-index: 1; padding: 2rem; }
 
@@ -167,10 +178,18 @@ img { max-width: 100%; display: block; }
 .sky--sunset  { background: linear-gradient(to bottom, #2b1140 0%, #7b2b52 34%, #d9645f 62%, #ffb27a 82%, #ffd9a8 100%); }
 .sky--galaxy  { background: radial-gradient(ellipse 80% 55% at 50% 30%, #33206b 0%, #150c33 52%, #070418 100%); }
 
-/* No tiled starfield here. A repeating background-size pattern reads as a
-   visible grid the moment it shows between two videos — the real stars are
-   the particle field, which never tiles. */
-.sky::before { display: none; }
+.sky::before {
+  background:
+    radial-gradient(1.5px 1.5px at 20% 24%, rgba(255,255,255,.95) 40%, transparent 41%),
+    radial-gradient(1.2px 1.2px at 74% 16%, rgba(230,240,255,.8) 40%, transparent 41%),
+    radial-gradient(1.7px 1.7px at 44% 62%, rgba(255,255,255,.9) 40%, transparent 41%),
+    radial-gradient(1.1px 1.1px at 88% 48%, rgba(210,225,255,.75) 40%, transparent 41%),
+    radial-gradient(1.4px 1.4px at 12% 76%, rgba(255,255,255,.85) 40%, transparent 41%);
+  background-size: 250px 250px, 310px 310px, 210px 210px, 350px 350px, 290px 290px;
+  animation: drift 90s linear infinite;
+  opacity: .55;
+}
+.sky--bloom::before, .sky--sunset::before { opacity: .22; }
 
 /* A soft ground glow. Deliberately no blur filter — blurring a full-screen
    layer every frame is exactly the kind of cost that shows up as scroll lag
@@ -253,32 +272,25 @@ img { max-width: 100%; display: block; }
   padding: clamp(4.5rem, 15vh, 9rem) 1.6rem 0;
   pointer-events: none;
 }
-/* A soft scrim under the words. Bright footage plus a wide coloured glow was
-   pretty and hard to read; a dark wash behind the text fixes that without
-   dimming the film itself. */
-.copy::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to bottom,
-    rgba(0,0,0,.55) 0%, rgba(0,0,0,.38) 26%, rgba(0,0,0,.10) 46%, transparent 62%);
-}
 .line {
-  grid-area: 1 / 1; position: relative;
+  grid-area: 1 / 1;
   margin: 0; max-width: 20ch; text-align: center;
   opacity: 0; will-change: opacity, transform;
-  color: #fff;
+  color: var(--ink);
   text-shadow:
-    0 1px 2px rgba(0,0,0,.9),
-    0 2px 14px rgba(0,0,0,.75),
-    0 0 34px color-mix(in srgb, var(--glow) 42%, transparent);
+    0 0 26px color-mix(in srgb, var(--glow) 55%, transparent),
+    0 0 60px color-mix(in srgb, var(--tint) 40%, transparent),
+    0 2px 18px rgba(0,0,0,.55);
 }
 .line--lg {
   font-size: clamp(1.85rem, 7.6vw, 3.1rem);
   font-weight: 300; line-height: 1.24; letter-spacing: .004em;
 }
 .line--sm {
-  font-size: clamp(1.14rem, 4.8vw, 1.55rem);
-  font-weight: 400; font-style: italic; line-height: 1.5;
+  font-size: clamp(1.05rem, 4.4vw, 1.45rem);
+  font-weight: 300; font-style: italic; line-height: 1.5;
   letter-spacing: .012em; max-width: 24ch;
+  color: color-mix(in srgb, var(--ink) 86%, transparent);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -449,6 +461,28 @@ img { max-width: 100%; display: block; }
 @keyframes orbHalo  { 0%,100% { transform: scale(.85); opacity: .45; } 50% { transform: scale(1.35); opacity: .9; } }
 .prop--orb.is-caught { transform: translate(-50%,-50%) scale(2.1); }
 
+/* the crystal */
+.prop--crystal { width: 82px; height: 132px; }
+.crystal__body {
+  position: absolute; inset: 0; display: block;
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--glow) 96%, transparent) 0%,
+    color-mix(in srgb, var(--tint) 88%, transparent) 42%,
+    color-mix(in srgb, var(--tint) 45%, transparent) 100%);
+  clip-path: polygon(50% 0%, 100% 32%, 78% 100%, 22% 100%, 0% 32%);
+  box-shadow: 0 0 44px color-mix(in srgb, var(--tint) 90%, transparent);
+  filter: drop-shadow(0 0 26px var(--glow));
+  animation: crystalHover 5s ease-in-out infinite;
+}
+.crystal__shine {
+  position: absolute; inset: 0; display: block;
+  background: linear-gradient(120deg, transparent 32%, rgba(255,255,255,.9) 47%, transparent 60%);
+  clip-path: polygon(50% 0%, 100% 32%, 78% 100%, 22% 100%, 0% 32%);
+  animation: shine 3.6s ease-in-out infinite; mix-blend-mode: screen;
+}
+@keyframes crystalHover { 0%,100% { transform: translateY(-8px) rotate(-2deg); } 50% { transform: translateY(8px) rotate(2deg); } }
+@keyframes shine { 0%,100% { opacity: .1; transform: translateX(-24%); } 50% { opacity: .95; transform: translateX(24%); } }
+.prop--crystal.is-caught { transform: translate(-50%,-50%) scale(1.9) rotate(14deg); }
 
 /* the butterfly */
 .prop--butterfly { width: 84px; height: 68px; animation: flutter 6s ease-in-out infinite; }
@@ -664,6 +698,7 @@ img { max-width: 100%; display: block; }
 /* ══════════════════════════════════════════════════════════════════════════
    ONE-SHOT EFFECTS
    ══════════════════════════════════════════════════════════════════════════ */
+<<<<<<< HEAD
 /* ── the crossing between two worlds ───────────────────────────────────── */
 .portal {
   --pa: #fff; --pb: #fff;
@@ -702,6 +737,8 @@ img { max-width: 100%; display: block; }
   50%      { transform: scale(1.14); opacity: .95; }
 }
 
+=======
+>>>>>>> parent of 73ef9e0 (اپدیت)
 .burst { position: fixed; z-index: 90; pointer-events: none; }
 .burst i, .burst__glyph {
   position: absolute; left: 0; top: 0; display: block;
@@ -742,7 +779,7 @@ img { max-width: 100%; display: block; }
    ══════════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .sky::before, .sky::after, .preloader__sky, .preloader__core,
-  .orb__core, .orb__halo,
+  .orb__core, .orb__halo, .crystal__body, .crystal__shine,
   .wing, .prop--butterfly, .prop--photo, .gate__finger, .gate__chev,
   .enter, .starname span, .scrollhint svg { animation: none !important; }
   .pfield { display: none; }
