@@ -129,6 +129,14 @@ img { max-width: 100%; display: block; }
   isolation: isolate;
 }
 
+/* Off-screen scenes stop compositing entirely: no particle animation, no
+   gradients, no video paint. Without this every scene you've already passed
+   keeps charging you rent, and the story gets heavier the further she gets. */
+.scene:not(.is-near) .pin { visibility: hidden; }
+.scene:not(.is-near) .pfield,
+.scene:not(.is-near) .sky::before,
+.scene:not(.is-near) .sky::after { animation-play-state: paused; }
+
 /* the video */
 .film {
   position: absolute; inset: 0;
@@ -183,13 +191,17 @@ img { max-width: 100%; display: block; }
 }
 .sky--bloom::before, .sky--sunset::before { opacity: .22; }
 
+/* A soft ground glow. Deliberately no blur filter — blurring a full-screen
+   layer every frame is exactly the kind of cost that shows up as scroll lag
+   three scenes deep. A wide gradient gets the same look for free. */
 .sky::after {
   background: radial-gradient(circle at 50% 78%,
-              color-mix(in srgb, var(--tint) 26%, transparent), transparent 58%);
-  filter: blur(30px);
+              color-mix(in srgb, var(--tint) 30%, transparent) 0%,
+              color-mix(in srgb, var(--tint) 12%, transparent) 34%,
+              transparent 64%);
   animation: swell 12s ease-in-out infinite;
 }
-@keyframes swell { 0%,100% { transform: scale(1); opacity: .5; } 50% { transform: scale(1.14); opacity: .82; } }
+@keyframes swell { 0%,100% { opacity: .5; } 50% { opacity: .85; } }
 
 /* ══════════════════════════════════════════════════════════════════════════
    PARTICLES
@@ -492,30 +504,6 @@ img { max-width: 100%; display: block; }
 @keyframes flutter { 0%,100% { transform: translate(-50%,-50%) translateY(-10px) } 50% { transform: translate(-50%,-50%) translateY(10px) rotate(4deg) } }
 .prop--butterfly.is-caught { transform: translate(-50%,-50%) translateY(-90px) scale(.6); opacity: 0; }
 
-/* hanging photographs */
-.prop--photo { width: 34vw; max-width: 148px; }
-.photo__thread {
-  position: absolute; left: 50%; bottom: 100%; width: 1px; height: 22vh; display: block;
-  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--glow) 70%, transparent));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--glow) 60%, transparent);
-}
-.photo__frame {
-  display: block; padding: 7px 7px 22px; border-radius: 3px;
-  background: linear-gradient(160deg, #fdf7ef, #e8dccb);
-  box-shadow: 0 0 26px color-mix(in srgb, var(--glow) 55%, transparent), 0 10px 26px rgba(0,0,0,.5);
-  transform: rotate(var(--tilt, 0deg));
-}
-.photo__frame img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 1px; }
-.photo__empty {
-  display: grid; place-items: center; aspect-ratio: 1/1;
-  background: linear-gradient(150deg, #3a2440, #1e1224);
-  color: color-mix(in srgb, var(--tint) 90%, #fff); font-size: 1.6rem;
-}
-.prop--photo { animation: sway 7s ease-in-out infinite; animation-delay: calc(var(--n) * -1.7s); }
-@keyframes sway { 0%,100% { transform: translate(-50%,-50%) rotate(-1.6deg) } 50% { transform: translate(-50%,-50%) rotate(1.6deg) } }
-.prop--photo.is-caught .photo__frame { transform: rotate(0) scale(1.06); box-shadow: 0 0 60px var(--glow), 0 10px 26px rgba(0,0,0,.5); }
-.gate.is-done .prop--photo.is-caught { opacity: .35; }
-
 /* ── swipe gates ───────────────────────────────────────────────────────── */
 .gate--swipe { display: grid; place-items: center; }
 .gate--swipe .prop { position: relative; left: auto; top: auto; transform: none; }
@@ -587,38 +575,18 @@ img { max-width: 100%; display: block; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   HER NAME, WRITTEN IN STARS
-   ══════════════════════════════════════════════════════════════════════════ */
-.starname {
-  --reveal: 0;
-  position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%);
-  display: flex; z-index: 2;
-  font-family: 'Parisienne', 'Cormorant Garamond', cursive;
-  font-size: clamp(3.4rem, 17vw, 6.4rem); line-height: 1;
-  color: #fff; white-space: pre;
-}
-.starname span {
-  display: inline-block;
-  opacity: clamp(0, calc((var(--reveal) * 12) - var(--n)), 1);
-  transform: translateY(calc((1 - clamp(0, calc((var(--reveal) * 12) - var(--n)), 1)) * 22px));
-  filter: blur(calc((1 - clamp(0, calc((var(--reveal) * 12) - var(--n)), 1)) * 8px));
-  text-shadow:
-    0 0 14px #fff,
-    0 0 34px color-mix(in srgb, var(--tint) 90%, transparent),
-    0 0 72px color-mix(in srgb, var(--tint) 70%, transparent);
-  animation: starTwinkle 3.4s ease-in-out infinite;
-  animation-delay: calc(var(--n) * -.42s);
-}
-@keyframes starTwinkle { 0%,100% { filter: brightness(1) } 50% { filter: brightness(1.35) } }
-
-/* ══════════════════════════════════════════════════════════════════════════
-   THE LAST CARD
+   THE LAST CARD — rises over the closing seconds of the final video
    ══════════════════════════════════════════════════════════════════════════ */
 .finale {
-  position: absolute; inset: 0; z-index: 2;
+  position: absolute; inset: 0; z-index: 3;
   display: grid; align-content: center; justify-items: center; gap: .5rem;
   padding: 2.4rem 1.8rem max(2.4rem, env(safe-area-inset-bottom));
   text-align: center;
+  opacity: 0; pointer-events: none;
+  background: radial-gradient(ellipse 90% 62% at 50% 50%,
+              color-mix(in srgb, var(--bg) 74%, transparent) 0%,
+              color-mix(in srgb, var(--bg) 30%, transparent) 62%,
+              transparent 100%);
 }
 .finale__script {
   margin: 0; font-family: 'Parisienne', cursive;

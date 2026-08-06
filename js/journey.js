@@ -12,6 +12,10 @@
   var CFG    = window.JOURNEY;
   var REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // How much of the remaining distance the film closes each 60fps frame.
+  // Low number = heavy, slow, cinematic. 1 = glued to the finger.
+  var EASE = REDUCE ? 1 : Math.max(0.03, 1 - (CFG.weight != null ? CFG.weight : 0.86));
+
   var stage   = document.getElementById('stage');
   var hud     = document.getElementById('hud');
   var hudBar  = document.getElementById('hudBar');
@@ -24,7 +28,6 @@
   var started = false;
   var locked  = false;
   var lockY   = 0;
-  var ticking = false;
   var activeIdx = -1;
 
   /* ── small helpers ─────────────────────────────────────────────────────── */
@@ -106,30 +109,16 @@
     });
     pin.appendChild(copy);
 
-    /* name written in starlight */
-    if (def.signature) {
-      var sig = document.createElement('div');
-      sig.className = 'starname';
-      def.signature.split('').forEach(function (ch, n) {
-        var s = document.createElement('span');
-        s.textContent = ch;
-        s.style.setProperty('--n', n);
-        sig.appendChild(s);
-      });
-      sig.setAttribute('aria-label', def.signature);
-      props.appendChild(sig);
-    }
-
-    /* the last card */
-    if (def.finale) {
-      props.appendChild(buildFinale(def.finale));
-    }
+    /* the last card — held back until the final seconds of the last video */
+    var finaleEl = def.finale ? buildFinale(def.finale) : null;
+    if (finaleEl) props.appendChild(finaleEl);
 
     sec.appendChild(pin);
 
     var rec = {
       def: def, el: sec, pin: pin, video: video, props: props,
-      lines: lineEls, copy: copy, gate: null, p: 0, duration: 0
+      lines: lineEls, copy: copy, finale: finaleEl,
+      gate: null, p: 0, sp: -1, duration: 0
     };
 
     if (def.gate) rec.gate = buildGate(rec, def.gate);
@@ -159,7 +148,6 @@
      ══════════════════════════════════════════════════════════════════════ */
   var SPOTS = {
     orb:   [[50, 34], [30, 50], [68, 60]],
-    photo: [[26, 30], [64, 26], [38, 52], [72, 50]],
     crystal: [[50, 46]],
     butterfly: [[50, 42]]
   };
@@ -273,16 +261,6 @@
     } else if (kind === 'butterfly') {
       el.innerHTML = '<span class="wing wing--l"></span><span class="wing wing--r"></span><span class="bfly__body"></span>';
       el.setAttribute('aria-label', 'Touch the butterfly');
-
-    } else if (kind === 'photo') {
-      var src = (def.photos || [])[i];
-      el.innerHTML =
-        '<span class="photo__thread" aria-hidden="true"></span>' +
-        '<span class="photo__frame">' +
-          (src ? '<img src="' + src + '" alt="">' : '<span class="photo__empty">♡</span>') +
-        '</span>';
-      el.setAttribute('aria-label', 'Open memory ' + (i + 1));
-      el.style.setProperty('--tilt', (i % 2 ? 1 : -1) * (3 + i) + 'deg');
 
     } else if (kind === 'gate') {
       el.innerHTML = '<span class="door"><span class="door__leaf"></span><span class="door__light"></span></span>';
@@ -464,11 +442,27 @@
      ══════════════════════════════════════════════════════════════════════ */
   function onScroll() {
     if (locked && !gliding && window.scrollY > lockY) window.scrollTo(0, lockY);
-    if (!ticking) { ticking = true; requestAnimationFrame(render); }
   }
 
-  function render() {
-    ticking = false;
+  /* One loop owns every frame. Scroll events only guard the lock — they never
+     drive the picture, so a stuttering fling can't stutter the film. */
+  var looping = false, lastT = 0;
+  function loop(now) {
+    if (!looping) return;
+    var dt = Math.min(64, now - lastT || 16);
+    lastT = now;
+    render(dt);
+    requestAnimationFrame(loop);
+  }
+  function startLoop() {
+    if (looping) return;
+    looping = true; lastT = performance.now();
+    requestAnimationFrame(loop);
+  }
+  function stopLoop() { looping = false; }
+
+  function render(dt) {
+    dt = dt || 16.667;
     var y  = window.scrollY;
     var vh = window.innerHeight;
     var best = -1;
@@ -480,18 +474,29 @@
       var p = clamp((y - top) / span, 0, 1);
       s.p = p;
 
+      // Anything more than half a screen away stops painting entirely — that
+      // is what keeps the last scenes as light as the first ones.
       var visible = (y + vh > top - vh * 0.5) && (y < top + s.el.offsetHeight + vh * 0.5);
       s.el.classList.toggle('is-near', visible);
-      if (!visible) continue;
+      if (!visible) { s.sp = -1; continue; }
 
       // The scene on screen is simply the one whose section owns this scroll
       // position — its pin is what's stuck to the viewport right now.
       if (y >= top - 1 && y < top + s.el.offsetHeight) best = i;
       else if (best < 0 && y >= top) best = i;
 
-      if (s.video && s.duration) scrub(s.video, p * s.duration * 0.999);
-      paintCopy(s, p);
-      if (s.def.signature) paintName(s, p);
+      // Damped follow: the film eases toward where the scroll says it should
+      // be instead of teleporting there. This is the weight in the scroll.
+      if (s.sp < 0) s.sp = p;
+      else {
+        var k = 1 - Math.pow(1 - EASE, dt / 16.667);
+        s.sp += (p - s.sp) * k;
+        if (Math.abs(p - s.sp) < 0.0004) s.sp = p;
+      }
+
+      if (s.video && s.duration) scrub(s.video, s.sp * s.duration * 0.999);
+      paintCopy(s, s.sp);
+      if (s.finale) paintFinale(s, s.sp);
       if (s.gate) paintGate(s, p, y, span, top);
     }
 
@@ -543,9 +548,11 @@
     }
   }
 
-  function paintName(s, p) {
-    var t = smoothstep(0.18, 0.62, p);
-    s.props.querySelector('.starname').style.setProperty('--reveal', t.toFixed(3));
+  function paintFinale(s, p) {
+    var t = smoothstep(s.def.finale.in, Math.min(1, s.def.finale.in + 0.13), p);
+    s.finale.style.opacity = t.toFixed(3);
+    s.finale.style.transform = 'translate3d(0,' + ((1 - t) * 30).toFixed(1) + 'px,0)';
+    s.finale.style.pointerEvents = t > 0.9 ? 'auto' : 'none';
   }
 
   function paintGate(s, p, y, span, top) {
@@ -591,7 +598,7 @@
     setTimeout(function () { scrollHint.classList.remove('is-on'); }, 5200);
 
     FX.tap([10, 60, 18]);
-    render();
+    startLoop();
   }
 
   function fadeIn() {
@@ -688,19 +695,20 @@
       // not a page you can scroll past.
       window.scrollTo(0, 0);
       lockScroll(0);
-      render();
+      startLoop();
     }).catch(function (err) {
       document.getElementById('loadStatus').textContent =
         'something went wrong loading the world — try refreshing';
       console.error(err);
     });
 
-    window.__J = { render: render, scenes: scenes, begin: begin };
+    window.__J = { render: render, scenes: scenes, begin: begin,
+                   loop: startLoop, halt: stopLoop };
 
     window.addEventListener('scroll', onScroll, { passive: true });
-    // A tab that was hidden mid-frame never fired its rAF; catch up on return.
+    // No point burning frames on a tab nobody is looking at.
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) { ticking = false; render(); }
+      if (document.hidden) stopLoop(); else startLoop();
     });
     window.addEventListener('resize', function () { setVH(); render(); });
     window.addEventListener('orientationchange', function () {

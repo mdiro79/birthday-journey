@@ -42,49 +42,31 @@ Once a video lives in a Blob, jumping to any frame is instant, which is the only
 way scroll-scrubbing stays smooth on a phone. Total payload is about 20 MB, so
 the first load wants Wi-Fi; after that it's cached.
 
-## The ten scenes
+## The six scenes
 
 | # | Scene | Video | Interaction |
 |---|-------|-------|-------------|
-| 1 | The Beginning | ✅ `01-beginning.mp4` | ENTER button |
-| 2 | Ice World | ✅ `02-ice-world.mp4` | tap the crystal |
-| 3 | Follow the Lights | ✅ `03-follow-the-lights.mp4` | tap 3 lights |
-| 4 | Magic Forest | ✅ `04-magic-forest.mp4` | swipe up to open |
-| 5 | Memories | ⬜ *needs `05-memories.mp4`* | tap 4 photos |
-| 6 | Flower Land | ✅ `06-flower-land.mp4` | tap the butterfly |
-| 7 | Sunset | ⬜ *needs `07-sunset.mp4`* | — |
-| 8 | Your Name in the Stars | ⬜ *needs `08-stars.mp4`* | — |
-| 9 | The Surprise | ✅ `09-surprise.mp4` | swipe up to open |
-| 10 | Happy Birthday | ⬜ *needs `10-finale.mp4`* | replay |
+| 1 | The Beginning | `01-beginning.mp4` | ENTER button |
+| 2 | Ice World | `02-ice-world.mp4` | tap the ice |
+| 3 | Follow the Lights | `03-follow-the-lights.mp4` | tap 3 lights |
+| 4 | Magic Forest | `04-magic-forest.mp4` | swipe up to open |
+| 5 | Flower Land | `06-flower-land.mp4` | tap the butterfly |
+| 6 | The Surprise | `09-surprise.mp4` | swipe to open + final card |
 
-Scenes without a video still run — they fall back to their own animated sky, so
-nothing breaks while the rest of the footage is being made.
+Every scene is real footage — there are no filler scenes. The birthday card
+rises over the closing seconds of scene 6 rather than getting a page of its own.
 
-## Adding the rest
+## Scroll weight
 
-Drop the file in `videos/` using the name from the table, then in
-`js/config.js` change that scene's line from:
+`WEIGHT` in `js/config.js` (0 → 1) is how far the film drifts behind her finger.
+`0.86` is heavy and cinematic. Lower it if you want the video to track faster.
 
-```js
-video: null,                    // ← videos/05-memories.mp4
-```
+Scene `length` is the other dial: bigger number = more scrolling for the same
+ten seconds of footage, so the picture moves slower.
 
-to:
+## Adding more footage
 
-```js
-video: 'videos/05-memories.mp4',
-```
-
-If the new footage already *shows* the thing she's meant to touch (a butterfly,
-a door, the gift), add `hotspot: true` to that scene's `gate` — the interaction
-becomes a ring of light over the footage instead of a drawn object on top of it.
-
-## Adding real photos (scene 5)
-
-Put them in `photos/`, then list them near the top of `js/config.js`:
-
-```js
-var PHOTOS = ['photos/us-1.jpg', 'photos/us-2.jpg', 'photos/us-3.jpg', 'photos/us-4.jpg'];
-```
-
-Square crops look best. With no photos listed you get glowing empty frames.
+Append a scene to `SCENES` in `js/config.js` with its `video`, `theme`, `lines`
+and (optionally) a `gate`. If the new footage already *shows* the thing she's
+meant to touch, add `hotspot: true` to the gate — the interaction becomes a ring
+of light over the film instead of a drawn object on top of it.
